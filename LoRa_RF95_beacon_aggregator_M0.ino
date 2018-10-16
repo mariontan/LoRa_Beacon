@@ -14,10 +14,11 @@
 
 RH_RF95 rf95d(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram rf95m(rf95d, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
-uint8_t utctime[20], utcdate[20], glong[20], glat[20], nsd, ewd;
+uint8_t utctime[20], utcdate[20], stat, glong[20], glat[20], nsd, ewd;
 int cindex[13]; // cnt - identify ',' position, aec - array element # for storing gps data
 int cnt = 0;
 int aec = 0;
+int led = 13;                                 // Use IO LED pin 13 of the Featherwing for to indicate send success
 
 // Need this on Arduino Zero with SerialUSB port (eg RocketScream Mini Ultra Pro)
 //#define Serial SerialUSB
@@ -49,6 +50,8 @@ void setup()
     // This is our Node ID
     rf95m.setThisAddress(RF_AGGREGATOR_ID);
     rf95m.setHeaderFrom(RF_AGGREGATOR_ID);
+
+    pinMode(led, OUTPUT);                     // Setup IO pin 13 to use the LED of the Featherwing
 }
 
 // Dont put this on the stack:
@@ -80,6 +83,7 @@ void loop()
         for (int j=cindex[i]; j<(cindex[i+1]-1); j++){
           switch (i) {
             case 0: utctime[aec] = buf[j+1]; break;
+            case 1: stat = buf[j+1]; break;
             case 2: glat[aec] = buf[j+1]; break;
             case 3: nsd = buf[j+1]; break;
             case 4: glong[aec] = buf[j+1]; break;
@@ -92,17 +96,22 @@ void loop()
         }
         aec = 0;
       }
-      Serial.print("#");
-      Serial.print((char*)utcdate); Serial.print(",");
-      Serial.print((char*)utctime); Serial.print(";");
-      Serial.print(from); Serial.print(";");
-      Serial.print(rssi); Serial.print(";");      
-      Serial.print((char*)glat); Serial.print(",");
-      Serial.print((char)nsd); Serial.print(";");
-      Serial.print((char*)glong); Serial.print(",");
-      Serial.print((char)ewd);
-      Serial.println("*");
+      if (stat == 65){
+        Serial.print("#");
+        Serial.print((char*)utcdate); Serial.print(",");
+        Serial.print((char*)utctime); Serial.print(";");
+        Serial.print(from); Serial.print(";");
+        Serial.print(rssi); Serial.print(";");      
+        Serial.print((char*)glat); Serial.print(",");
+        Serial.print((char)nsd); Serial.print(";");
+        Serial.print((char*)glong); Serial.print(",");
+        Serial.print((char)ewd);
+        Serial.println("*");
+        digitalWrite(led, HIGH);
+        delay(500);        
+      }
     }
+    digitalWrite(led, LOW);
   }
 }
 

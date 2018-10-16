@@ -14,7 +14,7 @@
 
 RH_RF95 rf95d;                                //Singleton instance of the radio driver
 RHReliableDatagram rf95m(rf95d, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
-uint8_t utctime[20], utcdate[20], glong[20], glat[20], nsd, ewd;
+uint8_t utctime[20], utcdate[20], stat, glong[20], glat[20], nsd, ewd;
 int index[13]; // cnt - identify ',' position, aec - array element # for storing gps data
 int cnt = 0;
 int aec = 0;
@@ -35,7 +35,17 @@ void setup()
   
     //Adjust Power to 23 dBm
     rf95d.setTxPower(23, false);
+
+    // Setup BandWidth, option: 7800,10400,15600,20800,31200,41700,62500,125000,250000,500000
+    //Lower BandWidth for longer distance.
+    rf95d.setSignalBandwidth(125000);
   
+    // Setup Spreading Factor (6 ~ 12)
+    rf95d.setSpreadingFactor(7);
+    
+    // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8) 
+    rf95d.setCodingRate4(5);
+    
     // This is our Node ID
     rf95m.setThisAddress(RF_AGGREGATOR_ID);
     rf95m.setHeaderFrom(RF_AGGREGATOR_ID);
@@ -70,6 +80,7 @@ void loop()
         for (int j=index[i]; j<(index[i+1]-1); j++){
           switch (i) {
             case 0: utctime[aec] = buf[j+1]; break;
+            case 1: stat = buf[j+1]; break;
             case 2: glat[aec] = buf[j+1]; break;
             case 3: nsd = buf[j+1]; break;
             case 4: glong[aec] = buf[j+1]; break;
@@ -82,19 +93,18 @@ void loop()
         }
         aec = 0;
       }
-      Serial.print("#");
-      Serial.print((char*)utcdate); Serial.print(",");
-      Serial.print((char*)utctime); Serial.print(";");
-      Serial.print(from); Serial.print(";");
-      Serial.print(rssi); Serial.print(";");      
-      Serial.print((char*)glat); Serial.print(",");
-      Serial.print((char)nsd); Serial.print(";");
-      Serial.print((char*)glong); Serial.print(",");
-      Serial.print((char)ewd);
-      Serial.print("*");
+      if (stat == 65){
+        Serial.print("#");
+        Serial.print((char*)utcdate); Serial.print(",");
+        Serial.print((char*)utctime); Serial.print(";");
+        Serial.print(from); Serial.print(";");
+        Serial.print(rssi); Serial.print(";");      
+        Serial.print((char*)glat); Serial.print(",");
+        Serial.print((char)nsd); Serial.print(";");
+        Serial.print((char*)glong); Serial.print(",");
+        Serial.print((char)ewd);
+        Serial.println("*");        
+      }
     }
   }
 }
-
-
-
