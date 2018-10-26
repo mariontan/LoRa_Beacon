@@ -14,11 +14,15 @@
 
 RH_RF95 rf95d(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram rf95m(rf95d, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
-uint8_t utctime[20], utcdate[20], stat, glong[20], glat[20], nsd, ewd;
-int cindex[13]; // cnt - identify ',' position, aec - array element # for storing gps data
-int cnt = 0;
-int aec = 0;
-int led = 13;                                 // Use IO LED pin 13 of the Featherwing for to indicate send success
+
+struct dataStruct {     //stores the sensor values in a struct for easier sending and receiving via LoRa
+  uint8_t hr, mnt, sec, yr, mth, dy, fixq;
+  char nsd, ewd;
+  float lattd, longtd, alttd, hdop;
+  boolean fix;
+} beaconData;
+
+char utctime[8], utcdate[8], nsd, ewd;
 
 // Need this on Arduino Zero with SerialUSB port (eg RocketScream Mini Ultra Pro)
 //#define Serial SerialUSB
@@ -51,7 +55,6 @@ void setup()
     rf95m.setThisAddress(RF_AGGREGATOR_ID);
     rf95m.setHeaderFrom(RF_AGGREGATOR_ID);
 
-    pinMode(led, OUTPUT);                     // Setup IO pin 13 to use the LED of the Featherwing
 }
 
 // Dont put this on the stack:
@@ -67,53 +70,26 @@ void loop()
     int8_t rssi = rf95d.lastRssi();
     if (rf95m.recvfromAck(buf, &len, &from, NULL, &id))
     {
-      cnt = 0;
-      for (int i=0; i<sizeof(buf); i++){
-        if (buf[i] == ',') {    // check for the position of the  "," separator
-          cindex[cnt]=i;
-          cnt++;
-        }
-        if (buf[i]=='*'){    // ... and the "*"
-          cindex[12]=i;
-          cnt++;
-        }        
-      }
-      aec = 0;
-      for (int i=0; i<12;i++) {
-        for (int j=cindex[i]; j<(cindex[i+1]-1); j++){
-          switch (i) {
-            case 0: utctime[aec] = buf[j+1]; break;
-            case 1: stat = buf[j+1]; break;
-            case 2: glat[aec] = buf[j+1]; break;
-            case 3: nsd = buf[j+1]; break;
-            case 4: glong[aec] = buf[j+1]; break;
-            case 5: ewd = buf[j+1]; break;
-            case 8: utcdate[aec] = buf[j+1]; break;
-            default: break;
-          }
-          aec++;
-//          Serial.write(buf[j+1]);          
-        }
-        aec = 0;
-      }
-      if (stat == 65){
+      memcpy(&beaconData, buf, sizeof(beaconData));
+      if (beaconData.fix && beaconData.fixq > 0){
+        // Reconstruct UTC date and time and write all beacon data to serial
+        sprintf(utcdate, "%02d%02d%02d", beaconData.dy, beaconData.mth, beaconData.yr);
+        sprintf(utctime, "%02d%02d%02d", beaconData.hr, beaconData.mnt, beaconData.sec);
+        nsd = (char)beaconData.nsd;
+        ewd = (char)beaconData.ewd;
         Serial.print("#");
         Serial.print((char*)utcdate); Serial.print(",");
         Serial.print((char*)utctime); Serial.print(";");
         Serial.print(from); Serial.print(";");
         Serial.print(rssi); Serial.print(";");      
-        Serial.print((char*)glat); Serial.print(",");
+        Serial.print(beaconData.lattd, 4); Serial.print(";");
         Serial.print((char)nsd); Serial.print(";");
-        Serial.print((char*)glong); Serial.print(",");
-        Serial.print((char)ewd);
+        Serial.print(beaconData.longtd, 4); Serial.print(";");
+        Serial.print((char)ewd); Serial.print(";");
+        Serial.print(beaconData.alttd); Serial.print(";");
+        Serial.print(beaconData.hdop);
         Serial.println("*");
-        digitalWrite(led, HIGH);
-        delay(500);        
       }
     }
-    digitalWrite(led, LOW);
   }
 }
-
-
-
