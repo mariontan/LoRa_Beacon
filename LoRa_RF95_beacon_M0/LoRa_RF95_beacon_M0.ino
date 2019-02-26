@@ -81,6 +81,10 @@ void setup() {
 
 void loop() {
   uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Alloted 251 bytes for tx_buf.
+
+  // update GPS data struct
+  GPS.update();
+
   // read data from the GPS in the 'main loop'
   char c = GPS.read();
   // if you want to debug, this is a good time to do it!
