@@ -3,93 +3,170 @@
 #include <RH_RF95.h>        //Library used to send messages using LoRa
 #include <Adafruit_GPS.h>   //Adafruit GPS Library for better parsing of data
 #include <string.h>
+#include <stdint.h>
 
+// SET LORA NODE IDs HERE
+#define RF_AGGREGATOR_ID 0 // Aggregator node's ID as receiver node ID.
+#define RF_BEACON_ID    3 // ID for this node.
+
+// SET DEFAULT LORA SETTINGS HERE
 #define RF_FREQUENCY  433.00
-#define RF_AGGREGATOR_ID 0
-#define RF_NODE_ID    3
+#define RF_TX_POWER 23
+#define RF_USE_RFO false
+#define RF_BANDWIDTH 125000
+#define RF_SPREAD_FACTOR 7
+#define RF_CODING_RATE 5
+#define RF_RETRIES 0
+
+// SET DEFAULT SERIAL SETTINGS HERE
+#define SERIAL_BAUDRATE 9600
+#define GPS_BAUDRATE 9600
 #define GPSSerial Serial1
+
+// SET DEFAULT MESSAGE SETTINGS HERE
 #define MAX_MSG_LEN 161
 
-RH_RF95 rf95d(8, 3);                          //Singleton instance of the radio driver
-RHReliableDatagram rf95m(rf95d, RF_NODE_ID);  //This class manages message delivery and reception
-Adafruit_GPS GPS(&GPSSerial);                 // Connect to the GPS on the hardware port
+// SET APP SETTINGS HERE
+#define GPSECHO false // Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console, 'true' if you want to debug and listen to the raw GPS sentences
+#define CSV_FORMAT //NICE_FORMAT (Readable format for terminal) or CSV_FORMAT (Can be parsed with Beacon's Android App) to toggle
+#define BROADCAST_INTERVAL_DURATION 2000 // DURATION BETWEEN BROADCASTS
 
-struct dataStruct {     //stores the sensor values in a struct for easier sending and receiving via LoRa
-  uint8_t hr, mnt, sec, yr, mth, dy, fixq;
+struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
+  uint8_t hour, minute, seconds, year, month, day, fixq;
   char nsd, ewd;
-  float lattd, longtd, alttd, hdop;
+  float latitude, longitude, altitude, hdop;
   boolean fix;
   char msg[MAX_MSG_LEN];
-} beaconData;
+};
 
-// Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
-// Set to 'true' if you want to debug and listen to the raw GPS sentences
-#define GPSECHO false
+// LOOP
+uint32_t last_broadcast_time;
 
-#define CSVString //NICEoutput or CSVString to toggle 
+// DATA BUFFERS
+BeaconData beaconData; // Storage for beacon data
+char* serial_buf; // Buffer for formatting strings.
+uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // LoRa Byte Array payload buffer
 
-uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN];
+// LORA-GPS SETUP
+RH_RF95 RF_DRIVER(8, 3);                          //Singleton instance of the radio driver
+RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_BEACON_ID);  //This class manages message delivery and reception
+Adafruit_GPS GPS(&GPSSerial);                 // Connect to the GPS on the hardware port
+uint8_t rf_destination = RF_AGGREGATOR_ID;
 
-uint32_t timer = millis();
-
-char inChar=-1; // Where to store the character read
-byte index1 = 0; // Index into array; where to store the character
-
-String gpsYear,gpsMon,gpsDay,gpsHour,gpsMin,gpsSec,gpsLat,gpsLon,gpsFix = "";
-
-
-
-void setup() {
-  Serial.begin(9600);              // Set the hardware serial port to 9600, baudrate of the GPS receiver
-  GPSSerial.begin(9600);
+// GPS INITIALIZATION
+void gps_init(uint baudRate = GPS_BAUDRATE) {
+  GPSSerial.begin(baudRate);
+  
   // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  
   // Set the update rate
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+}
 
-  /*--Initializing LoRa module--*/
-  if (rf95m.init()) {
-    //Adjust Frequency
-    rf95d.setFrequency(RF_FREQUENCY);
+// LORA INITIALIZATION
 
-    //Adjust Power to 23 dBm
-    rf95d.setTxPower(23, false);
+// Set RF95 Parameters
+void lora_set_parameters(float frequency = RF_FREQUENCY, int8_t txPower = RF_TX_POWER, bool useRFO = RF_USE_RFO, long bandwidth = RF_BANDWIDTH, int8_t spreadFactor = RF_SPREAD_FACTOR, int8_t codingRate = RF_CODING_RATE) {
+  
+  //Adjust Frequency
+  RF_DRIVER.setFrequency(frequency);
 
-    // Setup BandWidth, option: 7800,10400,15600,20800,31200,41700,62500,125000,250000,500000
-    //Lower BandWidth for longer distance.
-    rf95d.setSignalBandwidth(125000);
+  //Adjust Power to 23 dBm
+  RF_DRIVER.setTxPower(txPower, useRFO);
 
-    // Setup Spreading Factor (6 ~ 12)
-    rf95d.setSpreadingFactor(7);
+  // Setup BandWidth, option: 7800,10400,15600,20800,31200,41700,62500,125000,250000,500000
+  //Lower BandWidth for longer distance.
+  RF_DRIVER.setSignalBandwidth(bandwidth);
 
-    // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8)
-    rf95d.setCodingRate4(5);
+  // Setup Spreading Factor (6 ~ 12)
+  RF_DRIVER.setSpreadingFactor(spreadFactor);
 
-    // This is our Node ID
-    rf95m.setThisAddress(RF_NODE_ID);
-    rf95m.setHeaderFrom(RF_NODE_ID);
+  // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8)
+  RF_DRIVER.setCodingRate4(codingRate);
+}
 
-    // Where we're sending packet
-    rf95m.setHeaderTo(RF_AGGREGATOR_ID);
-    //rf95m.setRetries(7);
+// Set this node's ID
+void lora_set_source(uint8_t nodeID) {
+  // This is our Node ID
+  RF_MESSAGING.setThisAddress(nodeID);
+  RF_MESSAGING.setHeaderFrom(nodeID);
+}
+
+// Set destination node's ID
+void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES) {
+  // Where we're sending packet
+  RF_MESSAGING.setHeaderTo(nodeID);
+  if(retries > 0)
+    RF_MESSAGING.setRetries(retries);
+  rf_destination = nodeID;
+}
+
+// Set up driver and messaging service.
+void lora_setup() {
+  lora_set_parameters();
+  lora_set_source(RF_BEACON_ID);
+  lora_set_destination(RF_AGGREGATOR_ID);
+}
+
+// Initialize LoRa components.
+bool lora_init() {
+  if (!RF_MESSAGING.init()){
+    Serial.println("init failed");
+    return false;
   }
-  for (int i = 0; i < sizeof(tx_buf); i++) { // Initialize buffer for transmitted data by filling with NULL
-    tx_buf[i] = 0;
+  
+  lora_setup();
+  return true;
+}
+
+// TIME STAMP HELPER FUNCTIONS
+void broadcast_time_init() {
+  last_broadcast_time = millis() - BROADCAST_INTERVAL_DURATION;
+}
+
+void broadcast_time_stamp() {
+  last_broadcast_time = millis(); // reset the last_broadcast_time
+}
+
+uint32_t get_duration(uint32_t timer_end, uint32_t timer_start) {
+  // If the current time is greater than the last broadcast time, it still hasn't looped around. Get the duration normally.
+  // If the last broadcast time is greater than the current time, current time has looped around. Get the looped around duration.
+  return (timer_start <= timer_end) ? timer_end - timer_start : timer_end + (UINT32_MAX - timer_start);
+}
+
+// This service waits approximately every 30 seconds or so in between broadcasts.
+// Returns true if it's still waiting before it can broadcast again.
+// Returns false if it's done waiting before it can broadcast again.
+bool is_waiting_broadcast() {
+  return (get_duration(millis(), last_broadcast_time) <= BROADCAST_INTERVAL_DURATION);
+}
+
+// BUFFER HELPER FUNCTIONS
+void clear_buf(uint8_t* buf) {
+  // Clear buffer content by filling it with NULL
+  for (int i = 0; i < sizeof(buf); i++) { 
+    buf[i] = 0;
   }
 }
 
+void clear_msg_buf(char* buf) {
+  // Clear buffer content by filling it with NULL
+  for (int i = 0; i < sizeof(buf); i++) { 
+    buf[i] = 0;
+  } 
+}
 
-void loop() {
-  uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Alloted 251 bytes for tx_buf.
-
-  // update GPS data struct
-  GPS.update();
-
+// Returns false if we failed to parse a NMEA sentence from GPS
+bool gps_parse_new_data() {
+  
   // read data from the GPS in the 'main loop'
   char c = GPS.read();
+  
   // if you want to debug, this is a good time to do it!
   if (GPSECHO)
     if (c) Serial.print(c);
+    
   // if a sentence is received, we can check the checksum, parse it...
   if (GPS.newNMEAreceived()) {
     // a tricky thing here is if we print the NMEA sentence, or data
@@ -97,91 +174,171 @@ void loop() {
     // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
     //    Serial.println(GPS.lastNMEA()); // this also sets the newNMEAreceived() flag to false
     if (!GPS.parse(GPS.lastNMEA())) // this also sets the newNMEAreceived() flag to false
-      return; // we can fail to parse a sentence in which case we should just wait for another
+      return false; // we can fail to parse a sentence in which case we should just wait for another
   }
-  // if millis() or timer wraps around, we'll just reset it
-  if (timer > millis()) timer = millis();
-  // approximately every 30 seconds or so, print out the current stats
-  if (millis() - timer > 2000) {
-    timer = millis(); // reset the timer
+  return true;
+}
 
-    #ifdef NICEoutput
-    Serial.print("\nTime: ");
-    Serial.print(GPS.hour, DEC); Serial.print(':');
-    Serial.print(GPS.minute, DEC); Serial.print(':');
-    Serial.print(GPS.seconds, DEC); Serial.print('.');
-    Serial.println(GPS.milliseconds);
-    Serial.print("Date: ");
-    Serial.print(GPS.day, DEC); Serial.print('/');
-    Serial.print(GPS.month, DEC); Serial.print("/20");
-    Serial.println(GPS.year, DEC);
-    Serial.print("Fix: "); Serial.print((int)GPS.fix);
-    Serial.print(" quality: "); Serial.println((int)GPS.fixquality);
-    #endif
-    while (Serial.available() > 0) // Don't read unless
-                                   // there you know there is data
-    {
-        if(index1 < 160) // One less than the size of the array
-        {
-            inChar = Serial.read(); // Read a character
-            beaconData.msg[index1] = inChar; // Store it
-            index1++; // Increment where to write next
-            beaconData.msg[index1] = '\0'; // Null terminate the string
-        }
-        
-    }
-    index1 = 0;//reset index back to 0
-    #ifdef NICEoutput
-    Serial.print("message:");
-    Serial.println(beaconData.msg);
-    #endif
-    if (GPS.fix) {
-      #ifdef NICEoutput
-      Serial.println("Sending Beacon Signal...");
-      Serial.print("Location: ");
-      Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
-      Serial.print(", ");
-      Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
-      Serial.print("Altitude: "); Serial.println(GPS.altitude);
-      Serial.println();
-      #endif
-      beaconData.fix = GPS.fix;
-      beaconData.fixq = GPS.fixquality;
-      beaconData.hdop = GPS.HDOP;
-      beaconData.hr = GPS.hour;
-      beaconData.mnt = GPS.minute;
-      beaconData.sec = GPS.seconds;
-      beaconData.dy = GPS.day;
-      beaconData.mth = GPS.month;
-      beaconData.yr = GPS.year;
-      beaconData.lattd = GPS.latitude;
-      beaconData.nsd = GPS.lat;
-      beaconData.longtd = GPS.longitude;
-      beaconData.ewd = GPS.lon;
-      beaconData.alttd = GPS.altitude;
-      memcpy(tx_buf, &beaconData, sizeof(beaconData));
-      #ifdef CSVString //change to Single serial command, change to csv format for easy android parsing
-      gpsYear = String(beaconData.yr);
-      gpsMon = String(beaconData.mth);
-      gpsDay = String(beaconData.dy);
-      gpsHour = String(beaconData.hr);//store GPS.hour to beaaconData.hr to change cast properly uint8_t test = GPS.hour yields a value of 0 even if GPS.hour is not 0
-      gpsMin = String(beaconData.mnt);
-      gpsSec = String(beaconData.sec);
-      gpsLat = String(beaconData.lattd);
-      gpsLon = String(beaconData.longtd);
-      gpsFix = String(beaconData.fix);
-      Serial.println(gpsYear+","+gpsMon+","+gpsDay+","+gpsHour+","+gpsMin+","+gpsSec+","+gpsLat+","+gpsLon+","+gpsFix+","+beaconData.msg);
-      #endif
-      rf95m.sendtoWait(tx_buf, sizeof(beaconData), RF_AGGREGATOR_ID);
-      rf95m.waitPacketSent();
-      
-    }
-    else  Serial.println("0,0,0,0,0,0,0,0,0,no GPS LOCK");
-          
+// BEACON DATA HELPER FUNCTIONS
+
+// Populate beacon data struct with GPS values
+void gps_update_beacon_data(BeaconData* data) {
+  
+  // GPS FIX
+  data->fix = GPS.fix;
+  data->fixq = GPS.fixquality;
+
+  // GPS DATE TIME
+  data->hour = GPS.hour;
+  data->minute = GPS.minute;
+  data->seconds = GPS.seconds;
+  data->day = GPS.day;
+  data->month = GPS.month;
+  data->year = GPS.year;
+
+  // GPS POSITION
+  data->latitude = !GPS.fix ? 0 : GPS.latitude;
+  data->nsd = !GPS.fix ? 0 : GPS.lat;
+  data->longitude = !GPS.fix ? 0 : GPS.longitude;
+  data->ewd = !GPS.fix ? 0 : GPS.lon;
+  data->altitude = !GPS.fix ? 0 : GPS.altitude;
+  data->hdop = !GPS.fix ? 0 : GPS.HDOP;
+}
+
+void gps_clear_beacon_data(BeaconData* data) {
+  
+  // GPS FIX
+  data->fix = false;
+  data->fixq = 0;
+
+  // GPS DATE TIME
+  data->hour = 0;
+  data->minute = 0;
+  data->seconds = 0;
+  data->day = 0;
+  data->month = 0;
+  data->year = 0;
+
+  // GPS POSITION
+  data->latitude = 0;
+  data->nsd = 0;
+  data->longitude = 0;
+  data->ewd = 0;
+  data->altitude = 0;
+  data->hdop = 0;
+
+  clear_msg_buf(data->msg);
+}
+
+// Populate message buffer from Serial
+void serial_read_message(char* buf) {
+  int bufSize = sizeof(buf);
+  byte i = 0;
+  
+  // Don't read unless there you know there is data. Stop reading if one less than the size of the array.
+  while (Serial.available() > 0 && i < bufSize-1) { 
+    buf[i++] = Serial.read(); // Read a character // Store it. Increment where to write next
   }
-  for (int i = 0; i < sizeof(tx_buf); i++) {
-    tx_buf[i] = 0;
+  
+  buf[i] = '\0'; // Null terminate the string
+}
+
+// Populate beacon data struct with GPS and Serial Message. Map it onto payload buffer for sending.
+void populate_beacon_data(BeaconData* data) {
+  gps_update_beacon_data(data); // populate beacon data struct with GPS values
+  serial_read_message(data->msg); // populate beacon data struct with message from serial
+}
+
+// Print beacon data to serial
+void serial_print_beacon_data(char* buf, BeaconData* data) {
+  
+  #ifdef NICE_FORMAT
+  sprintf(buf, 
+    "\nTime: %2d:%2d:%2d.%d\nDate: %2d/%2d/20%2d\nFix: %d Quality:%d\nMessage: %s\nSending Beacon Signal...\nLocation: %f%s, %f%s\nAltitude: %f\n",
+    data->hour, data->minute, data->seconds, GPS.milliseconds, 
+    data->day, data->month, data->year, 
+    (int)data->fix, (int)data->fixq, data->msg,
+    data->latitude, data->nsd, data->longitude, data->ewd, data->altitude);
+  Serial.println(buf);
+  #endif
+  
+  #ifdef CSV_FORMAT // change to Single serial command, change to csv format for easy android parsing
+  sprintf(buf, "%d,%d,%d,%d,%d,%d,%f,%f,%s,%s",
+    data->year, data->month, data->day, data->hour, data->minute, data->seconds, // 18 chars
+    data->latitude, data->longitude, data->fix, // dddmm.mm,dddmm.mm,fff.ffff, 27
+    data->msg); // 161
+  Serial.println(buf);
+  #endif
+}
+
+// TX HELPER FUNCTIONS
+
+// Send beacon data over LoRa
+void send_beacon_data(BeaconData* data) {
+  clear_buf(tx_buf); // clear buffer before populating with data.
+  memcpy(tx_buf, data, sizeof(*data)); // populate buffer for tx with beacon data
+  lora_send(tx_buf, sizeof(beaconData), rf_destination);
+}
+
+// Send byte array payload over LoRa
+void lora_send(uint8_t* buf, uint8_t len, uint8_t address) {
+  RF_MESSAGING.sendtoWait(buf, len, address);// send buffered data to aggregator
+  RF_MESSAGING.waitPacketSent(); // wait until properly sent
+}
+
+// Broadcast generated data payload over LoRa
+void broadcast_data() {
+
+  // If cannot parse new data, don't do anything.
+  if(!gps_parse_new_data()){
+    // Populating beacon data with empty values
+    gps_clear_beacon_data(&beaconData);
   }
+  else {
+    // Populating beacon data with values from GPS and Serial
+    populate_beacon_data(&beaconData); // populate beacon data struct.
+  }
+  
+  // For Android App or Debug
+  serial_print_beacon_data(serial_buf, &beaconData); // print beacon data to serial.
+
+  // If no fix, don't do anything.
+  if (!beaconData.fix) 
+    return;
+
+  // Actually send it.
+  send_beacon_data(&beaconData);
+}
+
+// ARDUINO LIFE CYCLE
+
+void setup() {
+
+  // Set the hardware serial port to 9600, baudrate of the GPS receiver
+  Serial.begin(SERIAL_BAUDRATE);
+  
+  // Initialize GPS
+  gps_init();
+  
+  // Initialize Timer
+  broadcast_time_init();
+  
+  // Initialize LoRa
+  if (!lora_init())
+    return;
+
+  // TODO: Put here functions that should not be done until lora is initialized.
+}
+
+void loop() {
+
+  // If cannot broadcast, wait.
+  if(is_waiting_broadcast()) 
+    return;
+
+  // process and broadcast data
+  broadcast_data();
+  broadcast_time_stamp();
 }
 
 /***getting the data type of variable***/
@@ -189,10 +346,10 @@ void loop() {
 template <typename T_ty> struct TypeInfo { static const char * name; };
 template <typename T_ty> const char * TypeInfo<T_ty>::name = "unknown";
 
-// Handy macro to make querying stuff easier.
+// Handay macro to make querying stuff easier.
 #define TYPE_NAME(var) TypeInfo< typeof(var) >::name
 
-// Handy macro to make defining stuff easier.
+// Handay macro to make defining stuff easier.
 #define MAKE_TYPE_INFO(type)  template <> const char * TypeInfo<type>::name = #type;
 
 // Type-specific implementations.
