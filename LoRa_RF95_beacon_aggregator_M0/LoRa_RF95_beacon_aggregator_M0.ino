@@ -27,6 +27,8 @@
 
 // SET DEFAULT MESSAGE SETTINGS HERE
 #define MAX_MSG_LEN 161
+#define MAX_SERIAL_LEN 640
+#define MAX_DEBUG_LEN 640
 
 RH_RF95 RF_DRIVER(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
@@ -41,13 +43,23 @@ struct BeaconData {     //stores the sensor values in a struct for easier sendin
 
 // DATA BUFFERS
 BeaconData beaconData; // Storage for beacon data
-char* serial_buf; // Buffer for formatting strings.
-
-// Dont put this on the stack:
-uint8_t rx_buf[RH_RF95_MAX_MESSAGE_LEN]; // LoRa Byte Array payload buffer
+char serial_buf[MAX_SERIAL_LEN]; // Buffer for formatting strings.
+uint8_t rx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Dont put this on the stack. // LoRa Byte Array payload buffer
+#ifdef MAX_DEBUG_LEN
+char debug_buf[MAX_DEBUG_LEN]; // Buffer for debugger
+#endif
 
 // Need this on Arduino Zero with SerialUSB port (eg RocketScream Mini Ultra Pro)
 //#define Serial SerialUSB
+
+// HELPER
+void debug_log(String tag, String log_buf) {
+  #ifdef MAX_DEBUG_LEN
+  String buf = tag + ": " + log_buf;
+  buf.toCharArray(debug_buf, MAX_DEBUG_LEN);
+  Serial.println(debug_buf);
+  #endif
+}
 
 // LORA INITIALIZATION
 
