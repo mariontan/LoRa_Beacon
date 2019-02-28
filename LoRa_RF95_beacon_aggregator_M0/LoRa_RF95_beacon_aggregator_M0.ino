@@ -22,6 +22,14 @@
 #define RF_SPREAD_FACTOR 7
 #define RF_CODING_RATE 5
 
+#define RF_SPREAD_FACTOR_7 7
+#define RF_SPREAD_FACTOR_8 8
+#define RF_SPREAD_FACTOR_10 10
+#define RF_SPREAD_FACTOR_12 12
+
+#define RF_BANDWIDTH_125KHZ 125000
+#define RF_BANDWIDTH_62_5KHZ 62500
+
 // SET DEFAULT SERIAL SETTINGS HERE
 #define SERIAL_BAUDRATE 9600
 
@@ -93,6 +101,12 @@ void lora_set_source(uint8_t nodeID) {
 // Set up driver and messaging service.
 void lora_setup() {
   lora_set_parameters();
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_7);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_8);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_10);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_62_5KHZ, RF_SPREAD_FACTOR_10);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_12);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_62_5KHZ, RF_SPREAD_FACTOR_12);
   lora_set_source(RF_AGGREGATOR_ID);
 }
 
@@ -110,24 +124,27 @@ bool lora_init() {
 // RX HELPER FUNCTIONS
 
 // Receive byte array data from LoRa
-bool lora_recv(uint8_t* buf, uint8_t* from, uint8_t* id){
+bool lora_recv(uint8_t* buf, uint8_t* len, uint8_t* from, uint8_t* id){
 // If no message is available, ignore and wait.
   if (!RF_MESSAGING.available())
     return false;
   
-  uint8_t len = sizeof(buf);
+  debug_log("LORA RECEIVE", "Available");
 
   // If failed to received message from buffer, ignore and wait.
-  if (!RF_MESSAGING.recvfromAck(buf, &len, from, NULL, id))
+  if (!RF_MESSAGING.recvfromAck(buf, len, from, NULL, id))
     return false;
+    
+  debug_log("Receiving From", String(*from));
+  debug_log("Receiving Size in Bytes", String(*len));
 
   return true;
 }
 
 // Receive  Beacon Data from LoRa
-bool recv_beacon_data(BeaconData* data, uint8_t* from, uint8_t* id) {
+bool recv_beacon_data(BeaconData* data, uint8_t* len, uint8_t* from, uint8_t* id) {
 
-  if(!lora_recv(rx_buf, from, id)) 
+  if(!lora_recv(rx_buf, len, from, id)) 
     return false;
     
   // Map buffer onto beacon data struct.
@@ -137,8 +154,8 @@ bool recv_beacon_data(BeaconData* data, uint8_t* from, uint8_t* id) {
 }
 
 // Receive data from LoRa
-bool recv_data(uint8_t* from, uint8_t* id){
-  return recv_beacon_data(&beaconData, from, id);
+bool recv_data(uint8_t* len, uint8_t* from, uint8_t* id){
+  return recv_beacon_data(&beaconData, len, from, id);
 }
 
 // PROCESS DATA
@@ -188,7 +205,7 @@ void process_data(uint8_t senderID) {
 
 // ARDUINO LIFE CYCLE
 
-void setup() 
+void new_setup() 
 {  
   Serial.begin(SERIAL_BAUDRATE);
   while (!Serial) ; // Wait for serial port to be available
@@ -200,16 +217,39 @@ void setup()
   // TODO: Put here functions that should not be done until lora is initialized.
 }
 
-void loop()
+void new_loop()
 {
   // Wait for a message addressed to us from the client
   // Get header info: from (sender), id(TODO: research what this is)
-  uint8_t from, id;
+  uint8_t len, from, id;
 
   // If no data received, do nothing.
-  if(!recv_data(&from, &id)) 
+  if(!recv_data(&len, &from, &id)) 
     return;
 
   // Process data.
   process_data(from);
+}
+
+void simple_loop() {
+  uint8_t len, from, id;
+
+  if(!lora_recv(rx_buf, &len, &from, &id)) 
+    return;
+
+  char data[len];
+  
+  // Map buffer onto data
+  memcpy(data, rx_buf, len);
+
+  debug_log("Received Message", String(data));
+  
+}
+
+void setup() {
+  new_setup();
+}
+
+void loop() {
+  simple_loop();
 }

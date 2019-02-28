@@ -18,6 +18,14 @@
 #define RF_CODING_RATE 5
 #define RF_RETRIES 0
 
+#define RF_SPREAD_FACTOR_7 7
+#define RF_SPREAD_FACTOR_8 8
+#define RF_SPREAD_FACTOR_10 10
+#define RF_SPREAD_FACTOR_12 12
+
+#define RF_BANDWIDTH_125KHZ 125000
+#define RF_BANDWIDTH_62_5KHZ 62500
+
 // SET DEFAULT SERIAL SETTINGS HERE
 #define SERIAL_BAUDRATE 9600
 #define GPS_BAUDRATE 9600
@@ -130,6 +138,12 @@ void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES) {
 void lora_setup() {
   debug_log("Function", "Lora Setup");
   lora_set_parameters();
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_7);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_8);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_10);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_62_5KHZ, RF_SPREAD_FACTOR_10);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_125KHZ, RF_SPREAD_FACTOR_12);
+  //lora_set_parameters(RF_FREQUENCY,RF_TX_POWER,RF_USE_RFO, RF_BANDWIDTH_62_5KHZ, RF_SPREAD_FACTOR_12);
   lora_set_source(RF_BEACON_ID);
   lora_set_destination(RF_AGGREGATOR_ID);
 }
@@ -194,16 +208,16 @@ bool gps_parse_new_data() {
   char c = GPS.read();
   
   // if you want to debug, this is a good time to do it!
-  if (GPSECHO)
-    if (c) Serial.print(c);
+  if (c) debug_log("GPSECHO", String(c));
     
   // if a sentence is received, we can check the checksum, parse it...
   if (GPS.newNMEAreceived()) {
     // a tricky thing here is if we print the NMEA sentence, or data
     // we end up not listening and catching other sentences!
     // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
-    //    Serial.println(GPS.lastNMEA()); // this also sets the newNMEAreceived() flag to false
-    if (!GPS.parse(GPS.lastNMEA())) // this also sets the newNMEAreceived() flag to false
+    char* nmea = GPS.lastNMEA();
+    debug_log("NMEA", nmea); // this also sets the newNMEAreceived() flag to false
+    if (!GPS.parse(nmea)) // this also sets the newNMEAreceived() flag to false
       return false; // we can fail to parse a sentence in which case we should just wait for another
   }
   return true;
@@ -319,7 +333,7 @@ void send_beacon_data(BeaconData* data) {
 
 // Send byte array payload over LoRa
 void lora_send(uint8_t* buf, uint8_t len, uint8_t address) {
-  debug_log("LoRa Send" , len + " bytes to node #" + address );
+  debug_log("LoRa Send" , String(len) + " bytes to node #" + String(address) );
   RF_MESSAGING.sendtoWait(buf, len, address);// send buffered data to aggregator
   RF_MESSAGING.waitPacketSent(); // wait until properly sent
 }
@@ -352,13 +366,20 @@ void broadcast_data() {
 
 // ARDUINO LIFE CYCLE
 
-void setup() {
+void new_setup() {
 
   // Set the hardware serial port to 9600, baudrate of the GPS receiver
   Serial.begin(SERIAL_BAUDRATE);
   
   // Initialize GPS
-  gps_init();
+  // gps_init();
+
+
+  GPSSerial.begin(9600);
+  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  // Set the update rate
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
   
   // Initialize Timer
   broadcast_time_init();
@@ -370,7 +391,7 @@ void setup() {
   // TODO: Put here functions that should not be done until lora is initialized.
 }
 
-void loop() {
+void new_loop() {
 
   // If cannot broadcast, wait.
   if(is_waiting_broadcast()) 
@@ -379,6 +400,225 @@ void loop() {
   // process and broadcast data
   broadcast_data();
   broadcast_time_stamp();
+}
+
+
+void old_setup() {
+  Serial.begin(9600);              // Set the hardware serial port to 9600, baudrate of the GPS receiver
+  GPSSerial.begin(9600);
+  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  // Set the update rate
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+
+  /*--Initializing LoRa module--*/
+  if (RF_MESSAGING.init()) {
+    //Adjust Frequency
+    RF_DRIVER.setFrequency(RF_FREQUENCY);
+
+    //Adjust Power to 23 dBm
+    RF_DRIVER.setTxPower(23, false);
+
+    // Setup BandWidth, option: 7800,10400,15600,20800,31200,41700,62500,125000,250000,500000
+    //Lower BandWidth for longer distance.
+    RF_DRIVER.setSignalBandwidth(125000);
+
+    // Setup Spreading Factor (6 ~ 12)
+    RF_DRIVER.setSpreadingFactor(7);
+
+    // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8)
+    RF_DRIVER.setCodingRate4(5);
+
+    // This is our Node ID
+    RF_MESSAGING.setThisAddress(RF_BEACON_ID);
+    RF_MESSAGING.setHeaderFrom(RF_BEACON_ID);
+
+    // Where we're sending packet
+    RF_MESSAGING.setHeaderTo(RF_AGGREGATOR_ID);
+    //RF_MESSAGING.setRetries(7);
+  }
+  for (int i = 0; i < sizeof(tx_buf); i++) { // Initialize buffer for transmitted data by filling with NULL
+    tx_buf[i] = 0;
+  }
+}
+
+void old_loop() {
+  uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Alloted 251 bytes for tx_buf.
+  // read data from the GPS in the 'main loop'
+  char c = GPS.read();
+  // if you want to debug, this is a good time to do it!
+  if (GPSECHO)
+    if (c) Serial.print(c);
+  // if a sentence is received, we can check the checksum, parse it...
+  if (GPS.newNMEAreceived()) {
+    // a tricky thing here is if we print the NMEA sentence, or data
+    // we end up not listening and catching other sentences!
+    // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
+    //    Serial.println(GPS.lastNMEA()); // this also sets the newNMEAreceived() flag to false
+    if (!GPS.parse(GPS.lastNMEA())) // this also sets the newNMEAreceived() flag to false
+      return; // we can fail to parse a sentence in which case we should just wait for another
+  }
+  // if millis() or timer wraps around, we'll just reset it
+  if (last_broadcast_time > millis()) last_broadcast_time = millis();
+  // approximately every 30 seconds or so, print out the current stats
+  if (millis() - last_broadcast_time > 2000) {
+    last_broadcast_time = millis(); // reset the timer
+
+    #ifdef NICE_FORMAT
+    Serial.print("\nTime: ");
+    Serial.print(GPS.hour, DEC); Serial.print(':');
+    Serial.print(GPS.minute, DEC); Serial.print(':');
+    Serial.print(GPS.seconds, DEC); Serial.print('.');
+    Serial.println(GPS.milliseconds);
+    Serial.print("Date: ");
+    Serial.print(GPS.day, DEC); Serial.print('/');
+    Serial.print(GPS.month, DEC); Serial.print("/20");
+    Serial.println(GPS.year, DEC);
+    Serial.print("Fix: "); Serial.print((int)GPS.fix);
+    Serial.print(" quality: "); Serial.println((int)GPS.fixquality);
+    #endif
+    byte index1 = 0;//reset index back to 0
+    
+    while (Serial.available() > 0) // Don't read unless
+                                   // there you know there is data
+    {
+        if(index1 < 160) // One less than the size of the array
+        {
+            beaconData.msg[index1] =Serial.read(); // Read a character // Store it
+            index1++; // Increment where to write next
+            beaconData.msg[index1] = '\0'; // Null terminate the string
+        }
+        
+    }
+    #ifdef NICE_FORMAT
+    Serial.print("message:");
+    Serial.println(beaconData.msg);
+    #endif
+    if (GPS.fix) {
+      #ifdef NICE_FORMAT
+      Serial.println("Sending Beacon Signal...");
+      Serial.print("Location: ");
+      Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
+      Serial.print(", ");
+      Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
+      Serial.print("Altitude: "); Serial.println(GPS.altitude);
+      Serial.println();
+      #endif
+      beaconData.fix = GPS.fix;
+      beaconData.fixq = GPS.fixquality;
+      beaconData.hdop = GPS.HDOP;
+      beaconData.hour = GPS.hour;
+      beaconData.minute = GPS.minute;
+      beaconData.seconds = GPS.seconds;
+      beaconData.day = GPS.day;
+      beaconData.month = GPS.month;
+      beaconData.year = GPS.year;
+      beaconData.latitude = GPS.latitude;
+      beaconData.nsd = GPS.lat;
+      beaconData.longitude = GPS.longitude;
+      beaconData.ewd = GPS.lon;
+      beaconData.altitude = GPS.altitude;
+      memcpy(tx_buf, &beaconData, sizeof(beaconData));
+      #ifdef CSV_FORMAT //change to Single serial command, change to csv format for easy android parsing
+      String gpsYear = String(beaconData.year);
+      String gpsMon = String(beaconData.month);
+      String gpsDay = String(beaconData.day);
+      String gpsHour = String(beaconData.hour);//store GPS.hour to beaaconData.hr to change cast properly uint8_t test = GPS.hour yields a value of 0 even if GPS.hour is not 0
+      String gpsMin = String(beaconData.minute);
+      String gpsSec = String(beaconData.seconds);
+      String gpsLat = String(beaconData.latitude);
+      String gpsLon = String(beaconData.longitude);
+      String gpsFix = String(beaconData.fix);
+      Serial.println(gpsYear+","+gpsMon+","+gpsDay+","+gpsHour+","+gpsMin+","+gpsSec+","+gpsLat+","+gpsLon+","+gpsFix+","+beaconData.msg);
+      #endif
+      RF_MESSAGING.sendtoWait(tx_buf, sizeof(beaconData), RF_AGGREGATOR_ID);
+      RF_MESSAGING.waitPacketSent();
+      
+    }
+    else  Serial.println("0,0,0,0,0,0,0,0,0,no GPS LOCK");
+          
+  }
+  for (int i = 0; i < sizeof(tx_buf); i++) {
+    tx_buf[i] = 0;
+  }
+}
+
+void fix_loop() {
+ // uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Alloted 251 bytes for tx_buf.
+  // read data from the GPS in the 'main loop'
+  /*
+  char c = GPS.read();
+  // if a sentence is received, we can check the checksum, parse it...
+  if (GPS.newNMEAreceived()) {
+    // a tricky thing here is if we print the NMEA sentence, or data
+    // we end up not listening and catching other sentences!
+    // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
+    char* nmea = GPS.lastNMEA();
+    debug_log("NMEA", nmea); // this also sets the newNMEAreceived() flag to false
+    if (!GPS.parse(nmea)) // this also sets the newNMEAreceived() flag to false
+      return; // we can fail to parse a sentence in which case we should just wait for another
+  }
+  //*/
+  if(!gps_parse_new_data())
+    return;
+  // if millis() or timer wraps around, we'll just reset it
+  if (last_broadcast_time > millis()) last_broadcast_time = millis();
+  // approximately every 30 seconds or so, print out the current stats
+  if (millis() - last_broadcast_time > 2000) {
+    last_broadcast_time = millis(); // reset the timer
+
+    serial_read_message(beaconData.msg); // populate beacon data struct with message from serial
+    if (GPS.fix) {
+      populate_beacon_data(&beaconData); // populate beacon data struct.
+      send_beacon_data(&beaconData);;
+      
+    }
+    
+    serial_print_beacon_data(serial_buf, &beaconData); // print beacon data to serial.
+  }
+  clear_buf(tx_buf);
+}
+
+void simple_setup() {
+  
+  // Set the hardware serial port to 9600, baudrate of the GPS receiver
+  Serial.begin(SERIAL_BAUDRATE);
+
+  // Initialize Timer
+  broadcast_time_init();
+  
+  // Initialize LoRa
+  if (!lora_init())
+    return;
+}
+
+void simple_broadcast_data(uint8_t* buf) {
+  lora_send(buf, sizeof(buf), rf_destination);
+}
+
+uint8_t simple_index = 0;
+char simple_buf[MAX_MSG_LEN] ;
+
+void simple_loop() {
+  
+  // If cannot broadcast, wait.
+  if(is_waiting_broadcast()) 
+    return;
+
+  // process and broadcast data
+  sprintf(simple_buf, "%d", simple_index++);
+  memcpy(tx_buf, simple_buf, sizeof(simple_buf)); 
+  debug_log("Sending", simple_buf);
+  simple_broadcast_data(tx_buf);
+  broadcast_time_stamp();
+}
+
+void setup() {
+  simple_setup();
+}
+
+void loop() {
+  simple_loop(); 
 }
 
 /***getting the data type of variable***/
