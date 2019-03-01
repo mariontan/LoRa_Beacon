@@ -402,7 +402,7 @@ void broadcast_data() {
   send_beacon_data(&beaconData);
 }
 
-// ARDUINO LIFE CYCLE
+// BEACON USE CASE
 
 void beacon_setup() {
 
@@ -445,6 +445,15 @@ void beacon_loop() {
   broadcast_time_stamp();
 }
 
+// SIMPLE USE CASE
+
+uint8_t simple_index = 0;
+char simple_buf[MAX_MSG_LEN] ;
+
+void simple_broadcast_data(uint8_t* buf) {
+  lora_send(buf, sizeof(buf), rf_destination);
+}
+
 void simple_setup() {
   
   // Set the hardware serial port to 9600, baudrate of the GPS receiver
@@ -457,13 +466,6 @@ void simple_setup() {
   if (!lora_init())
     return;
 }
-
-void simple_broadcast_data(uint8_t* buf) {
-  lora_send(buf, sizeof(buf), rf_destination);
-}
-
-uint8_t simple_index = 0;
-char simple_buf[MAX_MSG_LEN] ;
 
 void simple_loop() {
   
@@ -478,6 +480,8 @@ void simple_loop() {
   simple_broadcast_data(tx_buf);
   broadcast_time_stamp();
 }
+
+// ARDUINO LIFE CYCLE
 
 void setup() {
   beacon_setup();
