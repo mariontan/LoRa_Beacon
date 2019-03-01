@@ -36,7 +36,14 @@
 // SET DEFAULT MESSAGE SETTINGS HERE
 #define MAX_MSG_LEN 161
 #define MAX_SERIAL_LEN 640
+
+// SET DEBUG SETTINGS HERE
 #define MAX_DEBUG_LEN 640
+//#define DEBUG_FUNCTION
+//#define DEBUG_LORA
+
+// SET APP SETTINGS HERE
+//#define PROCESS_ONLY_WITH_FIX
 
 RH_RF95 RF_DRIVER(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
@@ -125,19 +132,28 @@ bool lora_init() {
 
 // Receive byte array data from LoRa
 bool lora_recv(uint8_t* buf, uint8_t* len, uint8_t* from, uint8_t* id){
-// If no message is available, ignore and wait.
+
+  #ifdef DEBUG_FUNCTION
+  debug_log("Function", "lora_recv");
+  #endif
+  
+  // If no message is available, ignore and wait.
   if (!RF_MESSAGING.available())
     return false;
-  
-  debug_log("LORA RECEIVE", "Available");
 
+  #ifdef DEBUG_LORA
+  debug_log("LORA RECEIVE", "Available");
+  #endif
+  
   // If failed to received message from buffer, ignore and wait.
   if (!RF_MESSAGING.recvfromAck(buf, len, from, NULL, id))
     return false;
-    
+
+  #ifdef DEBUG_LORA
   debug_log("Receiving From", String(*from));
   debug_log("Receiving Size in Bytes", String(*len));
-
+  #endif
+  
   return true;
 }
 
@@ -196,8 +212,10 @@ void serial_print_data(uint from, uint rssi, BeaconData* data) {
 // Process data received from senderID
 void process_data(uint8_t senderID) {
   // If there's no GPS fix from received data, do nothing.
+  #ifdef PROCESS_ONLY_WITH_FIX
   if(!gps_has_fix(&beaconData))
     return;
+  #endif
     
   // Write all lora metadata and beacon data to serial
   serial_print_data(senderID, RF_DRIVER.lastRssi(), &beaconData);
@@ -251,5 +269,5 @@ void setup() {
 }
 
 void loop() {
-  simple_loop();
+  new_loop();
 }

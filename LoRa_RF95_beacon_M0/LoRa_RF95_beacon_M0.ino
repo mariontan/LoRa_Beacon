@@ -38,6 +38,7 @@
 // SET APP SETTINGS HERE
 #define CSV_FORMAT //NICE_FORMAT (Readable format for terminal) or CSV_FORMAT (Can be parsed with Beacon's Android App) to toggle
 #define BROADCAST_INTERVAL_DURATION 2000 // DURATION BETWEEN BROADCASTS
+//#define BROADCAST_ONLY_WITH_FIX
 
 // Set DEBUG SETTINGS HERE
 //#define MAX_DEBUG_LEN 640
@@ -393,10 +394,12 @@ void broadcast_data() {
   #ifdef DEBUG_BEACON
   debug_log("GPS FIX" , beaconData.fix ? "true" : "false" );
   #endif 
-  
+
+  #ifdef BROADCAST_ONLY_WITH_FIX
   // If no fix, don't do anything.
   if (!beaconData.fix) 
     return;
+  #endif
 
   // Actually send it.
   send_beacon_data(&beaconData);
