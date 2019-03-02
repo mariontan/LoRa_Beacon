@@ -33,7 +33,7 @@
 
 // SET DEFAULT MESSAGE SETTINGS HERE
 #define BEACON_META_LEN 26
-#define MAX_MSG_LEN 161 // (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN)
+#define MAX_MSG_LEN (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN) // 161
 #define MAX_SERIAL_OUT_LEN 640
 #define MAX_SERIAL_IN_LEN 161
 
@@ -95,6 +95,7 @@ void gps_init(uint baudRate = GPS_BAUDRATE) {
   
   // Set the update rate
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+  
 }
 
 // LORA INITIALIZATION
