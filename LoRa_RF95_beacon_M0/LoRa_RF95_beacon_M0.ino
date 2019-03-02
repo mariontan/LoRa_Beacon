@@ -32,14 +32,14 @@
 #define GPSSerial Serial1
 
 // SET DEFAULT MESSAGE SETTINGS HERE
-#define BEACON_META_LEN 26
+#define BEACON_META_LEN 24
 #define MAX_MSG_LEN (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN) // 161
 #define MAX_SERIAL_OUT_LEN 640
 #define MAX_SERIAL_IN_LEN 161
 
 // SET APP SETTINGS HERE
 #define CSV_FORMAT //NICE_FORMAT (Readable format for terminal) or CSV_FORMAT (Can be parsed with Beacon's Android App) to toggle
-#define BROADCAST_INTERVAL_DURATION 2000 // DURATION BETWEEN BROADCASTS
+#define BROADCAST_INTERVAL_MILLIS 2000 // DURATION BETWEEN BROADCASTS
 //#define BROADCAST_ONLY_WITH_FIX
 
 // Set DEBUG SETTINGS HERE
@@ -50,17 +50,16 @@
 //#define DEBUG_NMEA
 //#define DEBUG_SERIAL
 
-// 26 metadata bytes + MAX_MSG_LEN bytes
+// 24 metadata bytes + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
   uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
-  char nsd, ewd; // 1 byte each = 2 bytes
   float latitude, longitude, altitude, hdop; // 4 bytes each = 16 bytes
   boolean fix; // 1 byte
   char msg[MAX_MSG_LEN]; // MAX_MSG_LEN bytes
 };
 
 // LOOP
-uint32_t last_broadcast_time;
+uint32_t last_broadcast_millis;
 
 // DATA BUFFERS
 BeaconData beaconData; // Storage for beacon data
@@ -78,6 +77,7 @@ Adafruit_GPS GPS(&GPSSerial);                 // Connect to the GPS on the hardw
 uint8_t rf_destination = RF_AGGREGATOR_ID;
 
 // HELPER
+
 void debug_log(String tag, String log_buf) {
   #ifdef MAX_DEBUG_LEN
   String buf = tag + ": " + log_buf;
@@ -181,18 +181,18 @@ bool lora_init() {
   return true;
 }
 
-// TIME STAMP HELPER FUNCTIONS
+// TIME-DEPENDENT FUNCTIONS
 void broadcast_time_init() {
-  last_broadcast_time = millis() - BROADCAST_INTERVAL_DURATION;
+  last_broadcast_millis = millis() - BROADCAST_INTERVAL_MILLIS;
   #ifdef DEBUG_FUNCTION
-  debug_log("Function", "Broadcast Time Init: " + String(last_broadcast_time));
+  debug_log("Function", "Broadcast Time Init: " + String(last_broadcast_millis));
   #endif
 }
 
 void broadcast_time_stamp() {
-  last_broadcast_time = millis(); // reset the last_broadcast_time
+  last_broadcast_millis = millis(); // reset the last_broadcast_millis
   #ifdef DEBUG_FUNCTION
-  debug_log("Function", "Broadcast Time Stamp: " + String(last_broadcast_time));
+  debug_log("Function", "Broadcast Time Stamp: " + String(last_broadcast_millis));
   #endif
 }
 
@@ -205,60 +205,85 @@ uint32_t get_duration(uint32_t timer_end, uint32_t timer_start) {
 // This service waits approximately every 30 seconds or so in between broadcasts.
 // Returns true if it's still waiting before it can broadcast again.
 // Returns false if it's done waiting before it can broadcast again.
-bool is_waiting_broadcast() {
-  return (get_duration(millis(), last_broadcast_time) <= BROADCAST_INTERVAL_DURATION);
+bool is_waiting_broadcast(uint32_t interval = BROADCAST_INTERVAL_MILLIS) {
+  return (get_duration(millis(), last_broadcast_millis) <= interval);
+}
+
+void broadcast_loop(void (*broadcast)(), uint32_t interval = BROADCAST_INTERVAL_MILLIS) { 
+  
+  // If cannot broadcast, wait.
+  if(is_waiting_broadcast()) 
+    return;
+  (*broadcast)();
+  broadcast_time_stamp();
 }
 
 // BUFFER HELPER FUNCTIONS
-void clear_buf(uint8_t* buf) {
+template<typename T> void clear_buf(T* buf) {
   // Clear buffer content by filling it with NULL
   #ifdef DEBUG_BUF
-  debug_log("Function", "Clear Byte Array Buffer");
+  debug_log("Function", "Clear Array Buffer");
   #endif
   for (int i = 0; i < sizeof(buf); i++) { 
     buf[i] = 0;
   }
 }
 
-void clear_serial_in_buf(char* buf) {
-  // Clear buffer content by filling it with NULL
-  #ifdef DEBUG_BUF
-  debug_log("Function", "Clear Char Array Buffer");
+// INPUT STREAM FUNCTIONS
+
+// Populate message buffer from Serial
+void serial_read_message(char* buf) {
+  int bufSize = sizeof(buf);
+  byte i = 0;
+  
+  // Don't read unless there you know there is data. Stop reading if one less than the size of the array.
+  while (Serial.available() > 0 && i < bufSize-1) { 
+    buf[i++] = Serial.read(); // Read a character // Store it. Increment where to write next
+  }
+  
+  buf[i] = '\0'; // Null terminate the string
+  #ifdef DEBUG_SERIAL
+  debug_log("Serial Read Message", "'" + String(buf) + "'");
   #endif
-  for (int i = 0; i < sizeof(buf); i++) { 
-    buf[i] = 0;
-  } 
 }
 
 // Returns false if we failed to parse a NMEA sentence from GPS
-bool gps_parse_new_data() {
-  
+bool gps_parse_new_data(char* buf = NULL) {
   #ifdef DEBUG_FUNCTION
   debug_log("Function", "GPS Parse New Data");
   #endif
-  
   // read data from the GPS in the 'main loop'
   char c = GPS.read();
-  
   // if you want to debug, this is a good time to do it!
   #ifdef DEBUG_NMEA
   if (c) debug_log("GPSECHO", String(c));
   #endif
-  
   // if a sentence is received, we can check the checksum, parse it...
-  if (GPS.newNMEAreceived()) {
-    // a tricky thing here is if we print the NMEA sentence, or data
-    // we end up not listening and catching other sentences!
-    // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
-    char* nmea = GPS.lastNMEA();
-    #ifdef DEBUG_NMEA
-    debug_log("NMEA", nmea); // this also sets the newNMEAreceived() flag to false
-    #endif
-    if (!GPS.parse(nmea)) // this also sets the newNMEAreceived() flag to false
-      return false; // we can fail to parse a sentence in which case we should just wait for another
-  }
+  if (!GPS.newNMEAreceived()) return false;
+  // a tricky thing here is if we print the NMEA sentence, or data
+  // we end up not listening and catching other sentences!
+  // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
+  char* nmea = GPS.lastNMEA(); // this also sets the newNMEAreceived() flag to false
+  #ifdef DEBUG_NMEA
+  debug_log("NMEA", nmea); 
+  #endif
+  if (!GPS.parse(nmea)) return false; // we can fail to parse a sentence in which case we should just wait for another
+  if(buf != NULL) memcpy(buf, nmea, sizeof(nmea));
   return true;
 }
+
+void beacon_input_stream() {
+  
+  // Read from serial
+  serial_read_message(serial_in_buf); // populate beacon data struct with message from serial
+  
+  // NOTE: GPS must be parsed and logged onto the GPS struct every frame.
+  // If cannot parse new data, don't do anything.
+  if(!gps_parse_new_data()) {
+    // DO SOMETHING
+  }
+}
+
 
 // BEACON DATA HELPER FUNCTIONS
 
@@ -281,10 +306,8 @@ void gps_update_beacon_data(BeaconData* data) {
   data->year = GPS.year;
 
   // GPS POSITION
-  data->latitude = !GPS.fix ? 0 : GPS.latitude;
-  data->nsd = !GPS.fix ? 0 : GPS.lat;
-  data->longitude = !GPS.fix ? 0 : GPS.longitude;
-  data->ewd = !GPS.fix ? 0 : GPS.lon;
+  data->latitude = !GPS.fix ? 0 : GPS.latitudeDegrees;
+  data->longitude = !GPS.fix ? 0 : GPS.longitudeDegrees;
   data->altitude = !GPS.fix ? 0 : GPS.altitude;
   data->hdop = !GPS.fix ? 0 : GPS.HDOP;
 
@@ -310,32 +333,13 @@ void gps_clear_beacon_data(BeaconData* data) {
 
   // GPS POSITION
   data->latitude = 0;
-  data->nsd = 0;
   data->longitude = 0;
-  data->ewd = 0;
   data->altitude = 0;
   data->hdop = 0;
 
   // MSG BUF
-  clear_serial_in_buf(data->msg);
+  clear_buf(data->msg);
 }
-
-// Populate message buffer from Serial
-void serial_read_message(char* buf) {
-  int bufSize = sizeof(buf);
-  byte i = 0;
-  
-  // Don't read unless there you know there is data. Stop reading if one less than the size of the array.
-  while (Serial.available() > 0 && i < bufSize-1) { 
-    buf[i++] = Serial.read(); // Read a character // Store it. Increment where to write next
-  }
-  
-  buf[i] = '\0'; // Null terminate the string
-  #ifdef DEBUG_SERIAL
-  debug_log("Serial Read Message", "'" + String(buf) + "'");
-  #endif
-}
-
 
 // Print beacon data to serial
 void serial_print_beacon_data(char* buf, BeaconData* data) {
@@ -373,14 +377,14 @@ void send_beacon_data(BeaconData* data) {
 }
 
 // Send byte array payload over LoRa
-void lora_send(uint8_t* buf, uint8_t len, uint8_t address) {
+template<typename T> void lora_send(T* buf, uint8_t len, uint8_t address) {
   debug_log("LoRa Send" , String(len) + " bytes to node #" + String(address) );
-  RF_MESSAGING.sendtoWait(buf, len, address);// send buffered data to aggregator
+  RF_MESSAGING.sendtoWait((uint8_t*)buf, len, address);// send buffered data to aggregator
   RF_MESSAGING.waitPacketSent(); // wait until properly sent
 }
 
 // Broadcast generated data payload over LoRa
-void broadcast_data() {
+void broadcast_beacon_data() {
 
   // Populating beacon data
   gps_update_beacon_data(&beaconData); 
@@ -412,89 +416,45 @@ void beacon_setup() {
   // Initialize GPS
   gps_init();
   
-  // Initialize Timer
-  broadcast_time_init();
-
   // Clear Beacon Data
   gps_clear_beacon_data(&beaconData);
   
   // Initialize LoRa
-  if (!lora_init())
-    return;
+  if (!lora_init()) return;
 
   // TODO: Put here functions that should not be done until lora is initialized.
-}
-
-void update_input_stream() {
-  
-  // NOTE: GPS must be parsed and logged onto the GPS struct every frame.
-  // If cannot parse new data, don't do anything.
-  if(!gps_parse_new_data()) {
-    // DO SOMETHING
-  }
-
-  // Read from serial
-  serial_read_message(serial_in_buf); // populate beacon data struct with message from serial
-}
-
-void beacon_loop() {
-
-  // Keep reading from input streams opportunistically.
-  update_input_stream();
-  
-  // If waiting for broadcast interval, don't do anything.
-  if(is_waiting_broadcast()) 
-    return;
-
-  // Process and broadcast data.
-  broadcast_data();
-  broadcast_time_stamp();
 }
 
 // SIMPLE USE CASE
 
 uint8_t simple_index = 0;
-char simple_buf[MAX_MSG_LEN] ;
 
-void simple_broadcast_data(uint8_t* buf) {
-  lora_send(buf, sizeof(buf), rf_destination);
+void broadcast_test_data() {
+  sprintf(serial_in_buf, "%d", simple_index++);
+  #ifdef DEBUG_FUNCTION
+  debug_log("Sending", serial_in_buf);
+  #endif
+  lora_send(serial_in_buf, sizeof(serial_in_buf), rf_destination);
 }
 
 void simple_setup() {
-  
-  // Set the hardware serial port to 9600, baudrate of the GPS receiver
-  Serial.begin(SERIAL_BAUDRATE);
-
-  // Initialize Timer
-  broadcast_time_init();
-  
-  // Initialize LoRa
-  if (!lora_init())
-    return;
+  Serial.begin(SERIAL_BAUDRATE); // Set the hardware serial port to 9600, baudrate of the GPS receiver
+  if (!lora_init()) return; // Initialize LoRa
 }
 
-void simple_loop() {
-  
-  // If cannot broadcast, wait.
-  if(is_waiting_broadcast()) 
-    return;
-
-  // process and broadcast data
-  sprintf(simple_buf, "%d", simple_index++);
-  memcpy(tx_buf, simple_buf, sizeof(simple_buf)); 
-  debug_log("Sending", simple_buf);
-  simple_broadcast_data(tx_buf);
-  broadcast_time_stamp();
-}
-
-// ARDUINO LIFE CYCLE
+// MAIN LIFE CYCLE
 
 void setup() {
+  // Initialize Timer
+  broadcast_time_init();
   beacon_setup();
+  //simple_setup();
 }
 
 void loop() {
-  beacon_loop(); 
+  beacon_input_stream(); 
+  broadcast_loop(broadcast_beacon_data);
+  //broadcast_loop(broadcast_test_data);
 }
 
 /***getting the data type of variable***/

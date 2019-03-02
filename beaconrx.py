@@ -12,24 +12,20 @@ BEACON_TABLE_FIELDS = '''   id      INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             rssi    INTEGER NOT NULL,
         datetime    DATETIME NOT NULL,
             lat         TEXT NOT NULL,
-        nsd         TEXT NOT NULL,  
             long        TEXT NOT NULL,
-        ewd         TEXT NOT NULL,
             alt         TEXT NOT NULL,
             hdop        TEXT NOT NULL,
         msg         TEXT    
         '''
-BEACON_TABLE_DEFAULT_VALUES = "NULL,?,?,?,?,?,?,?,?,?,?"
+BEACON_TABLE_DEFAULT_VALUES = "NULL,?,?,?,?,?,?,?,?"
 BEACON_TABLE_NODE = 0;
 BEACON_TABLE_RSSI = 1;
 BEACON_TABLE_DATE = 2;
 BEACON_TABLE_LATITUDE = 3;
-BEACON_TABLE_NSD = 4;
-BEACON_TABLE_LONGITUDE = 5;
-BEACON_TABLE_EWD = 6;
-BEACON_TABLE_ALTITUDE = 7;
-BEACON_TABLE_HDOP = 8;
-BEACON_TABLE_MESSAGE = 9;
+BEACON_TABLE_LONGITUDE = 4;
+BEACON_TABLE_ALTITUDE = 5
+BEACON_TABLE_HDOP = 6;
+BEACON_TABLE_MESSAGE = 7;
 
 def read_data(node):
     data = []
@@ -66,8 +62,8 @@ def insert_into_table(cursor, db_connection, table, values, data):
     db_connection.commit()
 
 def select_last_entry_from_table(cursor, table)
-    c.execute("SELECT * FROM %s WHERE id = (SELECT MAX(id) from %s);" % (table, table))
-    print(c.fetchall())
+    cursor.execute("SELECT * FROM %s WHERE id = (SELECT MAX(id) from %s);" % (table, table))
+    print(cursor.fetchall())
 
 def save_data(data):
     conn = sqlite3.connect('beaconrx.db')

@@ -34,7 +34,7 @@
 #define SERIAL_BAUDRATE 9600
 
 // SET DEFAULT MESSAGE SETTINGS HERE
-#define BEACON_META_LEN 26
+#define BEACON_META_LEN 24
 #define MAX_MSG_LEN (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN) // 161
 #define MAX_SERIAL_OUT_LEN 640
 
@@ -49,10 +49,9 @@
 RH_RF95 RF_DRIVER(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
 
-// 26 metadata bytes + MAX_MSG_LEN bytes
+// 24 metadata bytes + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
   uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
-  char nsd, ewd; // 1 byte each = 2 bytes
   float latitude, longitude, altitude, hdop; // 4 bytes each = 16 bytes
   boolean fix; // 1 byte
   char msg[MAX_MSG_LEN]; // MAX_MSG_LEN bytes
@@ -189,10 +188,10 @@ void serial_print_beacon(char* buf, BeaconData* data) {
   // Reconstruct UTC date and time
   // Print delimited sentence
   sprintf(buf, 
-    "%02d%02d%02d,%02d%02d%02d;%f;%c;%f;%c;%f;%f;%s;", 
+    "%02d%02d%02d,%02d%02d%02d;%f;%f;%f;%f;%s;", 
     data->day, data->month, data->year, 
     data->hour, data->minute, data->seconds,
-    data->latitude, data->nsd == 0 ? 'N' : data->nsd, data->longitude, data->ewd == 0 ? 'E' : data->ewd, 
+    data->latitude, data->longitude,
     data->altitude, data->hdop, data->msg);
   Serial.print(buf); 
 }
