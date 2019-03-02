@@ -32,7 +32,8 @@
 #define GPSSerial Serial1
 
 // SET DEFAULT MESSAGE SETTINGS HERE
-#define MAX_MSG_LEN 161
+#define BEACON_META_LEN 26
+#define MAX_MSG_LEN 161 // (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN)
 #define MAX_SERIAL_OUT_LEN 640
 #define MAX_SERIAL_IN_LEN 161
 
@@ -49,7 +50,7 @@
 //#define DEBUG_NMEA
 //#define DEBUG_SERIAL
 
-// 26 + MAX_MSG_LEN bytes
+// 26 metadata bytes + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
   uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
   char nsd, ewd; // 1 byte each = 2 bytes

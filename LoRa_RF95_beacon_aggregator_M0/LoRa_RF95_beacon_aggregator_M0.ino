@@ -34,7 +34,8 @@
 #define SERIAL_BAUDRATE 9600
 
 // SET DEFAULT MESSAGE SETTINGS HERE
-#define MAX_MSG_LEN 161
+#define BEACON_META_LEN 26
+#define MAX_MSG_LEN 161 // (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN)
 #define MAX_SERIAL_OUT_LEN 640
 
 // SET DEBUG SETTINGS HERE
@@ -48,7 +49,7 @@
 RH_RF95 RF_DRIVER(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
 
-// 26 + MAX_MSG_LEN bytes
+// 26 metadata bytes + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
   uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
   char nsd, ewd; // 1 byte each = 2 bytes
