@@ -33,7 +33,8 @@
 
 // SET DEFAULT MESSAGE SETTINGS HERE
 #define MAX_MSG_LEN 161
-#define MAX_SERIAL_LEN 640
+#define MAX_SERIAL_OUT_LEN 640
+#define MAX_SERIAL_IN_LEN 161
 
 // SET APP SETTINGS HERE
 #define CSV_FORMAT //NICE_FORMAT (Readable format for terminal) or CSV_FORMAT (Can be parsed with Beacon's Android App) to toggle
@@ -48,13 +49,13 @@
 //#define DEBUG_NMEA
 //#define DEBUG_SERIAL
 
-
+// 26 + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
-  uint8_t hour, minute, seconds, year, month, day, fixq;
-  char nsd, ewd;
-  float latitude, longitude, altitude, hdop;
-  boolean fix;
-  char msg[MAX_MSG_LEN];
+  uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
+  char nsd, ewd; // 1 byte each = 2 bytes
+  float latitude, longitude, altitude, hdop; // 4 bytes each = 16 bytes
+  boolean fix; // 1 byte
+  char msg[MAX_MSG_LEN]; // MAX_MSG_LEN bytes
 };
 
 // LOOP
@@ -62,7 +63,8 @@ uint32_t last_broadcast_time;
 
 // DATA BUFFERS
 BeaconData beaconData; // Storage for beacon data
-char serial_buf[MAX_SERIAL_LEN]; // Buffer for formatting strings.
+char serial_out_buf[MAX_SERIAL_OUT_LEN]; // Buffer for formatting strings for serial output.
+char serial_in_buf[MAX_SERIAL_IN_LEN]; // Buffer for serial input.
 uint8_t tx_buf[RH_RF95_MAX_MESSAGE_LEN]; // LoRa Byte Array payload buffer
 #ifdef MAX_DEBUG_LEN
 char debug_buf[MAX_DEBUG_LEN]; // Buffer for debugger
@@ -216,7 +218,7 @@ void clear_buf(uint8_t* buf) {
   }
 }
 
-void clear_msg_buf(char* buf) {
+void clear_serial_in_buf(char* buf) {
   // Clear buffer content by filling it with NULL
   #ifdef DEBUG_BUF
   debug_log("Function", "Clear Char Array Buffer");
@@ -283,6 +285,8 @@ void gps_update_beacon_data(BeaconData* data) {
   data->ewd = !GPS.fix ? 0 : GPS.lon;
   data->altitude = !GPS.fix ? 0 : GPS.altitude;
   data->hdop = !GPS.fix ? 0 : GPS.HDOP;
+
+  memcpy(data->msg, serial_in_buf, MAX_MSG_LEN);
 }
 
 void gps_clear_beacon_data(BeaconData* data) {
@@ -310,7 +314,8 @@ void gps_clear_beacon_data(BeaconData* data) {
   data->altitude = 0;
   data->hdop = 0;
 
-  clear_msg_buf(data->msg);
+  // MSG BUF
+  clear_serial_in_buf(data->msg);
 }
 
 // Populate message buffer from Serial
@@ -329,16 +334,6 @@ void serial_read_message(char* buf) {
   #endif
 }
 
-// Populate beacon data struct with GPS and Serial Message. Map it onto payload buffer for sending.
-void populate_beacon_data(BeaconData* data) {
-  
-  #ifdef DEBUG_FUNCTION
-  debug_log("Function", "Populate Beacon Data");
-  #endif
-  
-  gps_update_beacon_data(data); // populate beacon data struct with GPS values
-  serial_read_message(data->msg); // populate beacon data struct with message from serial
-}
 
 // Print beacon data to serial
 void serial_print_beacon_data(char* buf, BeaconData* data) {
@@ -370,9 +365,9 @@ void serial_print_beacon_data(char* buf, BeaconData* data) {
 
 // Send beacon data over LoRa
 void send_beacon_data(BeaconData* data) {
-  clear_buf(tx_buf); // clear buffer before populating with data.
-  memcpy(tx_buf, data, sizeof(*data)); // populate buffer for tx with beacon data
-  lora_send(tx_buf, sizeof(beaconData), rf_destination);
+  //clear_buf(tx_buf); // clear buffer before populating with data.
+  //memcpy(tx_buf, data, sizeof(*data)); // populate buffer for tx with beacon data
+  lora_send((uint8_t*)data, sizeof(*data), rf_destination);
 }
 
 // Send byte array payload over LoRa
@@ -385,11 +380,11 @@ void lora_send(uint8_t* buf, uint8_t len, uint8_t address) {
 // Broadcast generated data payload over LoRa
 void broadcast_data() {
 
-  // Populating beacon data with values from GPS and Serial
-  populate_beacon_data(&beaconData); // populate beacon data struct.
+  // Populating beacon data
+  gps_update_beacon_data(&beaconData); 
   
   // For Android App or Debug
-  serial_print_beacon_data(serial_buf, &beaconData); // print beacon data to serial.
+  serial_print_beacon_data(serial_out_buf, &beaconData); // print beacon data to serial.
 
   #ifdef DEBUG_BEACON
   debug_log("GPS FIX" , beaconData.fix ? "true" : "false" );
@@ -413,17 +408,13 @@ void beacon_setup() {
   Serial.begin(SERIAL_BAUDRATE);
   
   // Initialize GPS
-  // gps_init();
-
-
-  GPSSerial.begin(9600);
-  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
-  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-  // Set the update rate
-  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+  gps_init();
   
   // Initialize Timer
   broadcast_time_init();
+
+  // Clear Beacon Data
+  gps_clear_beacon_data(&beaconData);
   
   // Initialize LoRa
   if (!lora_init())
@@ -432,12 +423,22 @@ void beacon_setup() {
   // TODO: Put here functions that should not be done until lora is initialized.
 }
 
-void beacon_loop() {
-
+void update_input_stream() {
+  
   // NOTE: GPS must be parsed and logged onto the GPS struct every frame.
   // If cannot parse new data, don't do anything.
-  if(!gps_parse_new_data())
-    return;
+  if(!gps_parse_new_data()) {
+    // DO SOMETHING
+  }
+
+  // Read from serial
+  serial_read_message(serial_in_buf); // populate beacon data struct with message from serial
+}
+
+void beacon_loop() {
+
+  // Keep reading from input streams opportunistically.
+  update_input_stream();
   
   // If waiting for broadcast interval, don't do anything.
   if(is_waiting_broadcast()) 

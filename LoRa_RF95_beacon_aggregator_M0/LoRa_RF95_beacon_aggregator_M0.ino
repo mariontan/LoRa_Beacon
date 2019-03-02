@@ -35,7 +35,7 @@
 
 // SET DEFAULT MESSAGE SETTINGS HERE
 #define MAX_MSG_LEN 161
-#define MAX_SERIAL_LEN 640
+#define MAX_SERIAL_OUT_LEN 640
 
 // SET DEBUG SETTINGS HERE
 #define MAX_DEBUG_LEN 640
@@ -48,17 +48,18 @@
 RH_RF95 RF_DRIVER(8,3);                                //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_AGGREGATOR_ID);  //This class manages message delivery and reception
 
+// 26 + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
-  uint8_t hour, minute, seconds, year, month, day, fixq;
-  char nsd, ewd;
-  float latitude, longitude, altitude, hdop;
-  boolean fix;
-  char msg[MAX_MSG_LEN];
+  uint8_t hour, minute, seconds, year, month, day, fixq; // 1 byte each = 7 bytes
+  char nsd, ewd; // 1 byte each = 2 bytes
+  float latitude, longitude, altitude, hdop; // 4 bytes each = 16 bytes
+  boolean fix; // 1 byte
+  char msg[MAX_MSG_LEN]; // MAX_MSG_LEN bytes
 };
 
 // DATA BUFFERS
 BeaconData beaconData; // Storage for beacon data
-char serial_buf[MAX_SERIAL_LEN]; // Buffer for formatting strings.
+char serial_out_buf[MAX_SERIAL_OUT_LEN]; // Buffer for formatting output strings to serial.
 uint8_t rx_buf[RH_RF95_MAX_MESSAGE_LEN]; // Dont put this on the stack. // LoRa Byte Array payload buffer
 #ifdef MAX_DEBUG_LEN
 char debug_buf[MAX_DEBUG_LEN]; // Buffer for debugger
@@ -160,11 +161,11 @@ bool lora_recv(uint8_t* buf, uint8_t* len, uint8_t* from, uint8_t* id){
 // Receive  Beacon Data from LoRa
 bool recv_beacon_data(BeaconData* data, uint8_t* len, uint8_t* from, uint8_t* id) {
 
-  if(!lora_recv(rx_buf, len, from, id)) 
+  if(!lora_recv((uint8_t*)data, len, from, id)) 
     return false;
     
   // Map buffer onto beacon data struct.
-  memcpy(data, rx_buf, sizeof(*data));
+  // memcpy(data, rx_buf, sizeof(*data));
   
   return true;
 }
@@ -187,10 +188,10 @@ void serial_print_beacon(char* buf, BeaconData* data) {
   // Reconstruct UTC date and time
   // Print delimited sentence
   sprintf(buf, 
-    "%02d%02d%02d,%02d%02d%02d;%f;%s;%f;%s;%f;%f;%s;", 
+    "%02d%02d%02d,%02d%02d%02d;%f;%c;%f;%c;%f;%f;%s;", 
     data->day, data->month, data->year, 
     data->hour, data->minute, data->seconds,
-    data->latitude, data->nsd, data->longitude, data->ewd, 
+    data->latitude, data->nsd == 0 ? 'N' : data->nsd, data->longitude, data->ewd == 0 ? 'E' : data->ewd, 
     data->altitude, data->hdop, data->msg);
   Serial.print(buf); 
 }
@@ -204,8 +205,8 @@ bool gps_has_fix(BeaconData* data) {
 void serial_print_data(uint from, uint rssi, BeaconData* data) {
   
   Serial.print("#");
-  serial_print_lora_info(serial_buf,from,rssi); // Print LoRa Node and RSSI
-  serial_print_beacon(serial_buf, data); // Print Beacon GPS and Message
+  serial_print_lora_info(serial_out_buf,from,rssi); // Print LoRa Node and RSSI
+  serial_print_beacon(serial_out_buf, data); // Print Beacon GPS and Message
   Serial.println("*");
 }
 
