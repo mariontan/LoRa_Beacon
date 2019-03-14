@@ -3,6 +3,7 @@ import os
 import shutil
 import logging
 import filecmp
+import time
 
 report_filename = 'report_outbox_%s.txt' % time.strftime('%Y_%m_%d_%H_%M_%S')
 logging.basicConfig(
