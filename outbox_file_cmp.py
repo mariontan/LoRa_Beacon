@@ -56,7 +56,7 @@ def load_directory(dir_path, dest_path):
 		# try to load file
 		# skip to the next file if it already exists and it's the same file
 		if file_cmp(file_path, dest_file_path):
-			logging.info("Ignoring %s because it is the same as %s." (file_path, dest_file_path))
+			logging.info("Ignoring %s because it is the same as %s." % (file_path, dest_file_path))
 			continue
 
 		# move the successfully loaded file
