@@ -5,15 +5,13 @@ import logging
 import filecmp
 import time
 
-report_filename = 'report_outbox_%s.txt' % time.strftime('%Y_%m_%d_%H_%M_%S')
+report_filename = 'report_outbox.txt' 
 logging.basicConfig(
 				filename=report_filename,
 				level=logging.INFO,
 				format='%(levelname)s:%(message)s')
 
-logging.info('sample header\n')
-logging.error('sample error\n')
-logging.info('%d %s\n' % (5, 'sample'))
+logging.info('Logged at %s\n' % % time.strftime('%Y_%m_%d_%H_%M_%S'))
 
 def file_cmp(source, dest):
 	if not os.path.exists(dest):
