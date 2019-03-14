@@ -95,7 +95,6 @@ void gps_init(uint baudRate = GPS_BAUDRATE) {
   
   // Set the update rate
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
-  
 }
 
 // LORA INITIALIZATION
@@ -209,8 +208,9 @@ bool is_waiting_broadcast(uint32_t interval = BROADCAST_INTERVAL_MILLIS) {
   return (get_duration(millis(), last_broadcast_millis) <= interval);
 }
 
+// broadcast: the function for broadcasting
+// interval: time between broadcasts
 void broadcast_loop(void (*broadcast)(), uint32_t interval = BROADCAST_INTERVAL_MILLIS) { 
-  
   // If cannot broadcast, wait.
   if(is_waiting_broadcast()) 
     return;
@@ -224,27 +224,27 @@ template<typename T> void clear_buf(T* buf) {
   #ifdef DEBUG_BUF
   debug_log("Function", "Clear Array Buffer");
   #endif
-  for (int i = 0; i < sizeof(buf); i++) { 
-    buf[i] = 0;
-  }
+  for (int i = 0; i < sizeof(buf); i++) { buf[i] = 0; }
 }
 
 // INPUT STREAM FUNCTIONS
 
 // Populate message buffer from Serial
-void serial_read_message(char* buf) {
-  int bufSize = sizeof(buf);
-  byte i = 0;
+bool serial_read_message(char* buf, uint8_t len) {
+  // If there's nothing to read, do nothing.
+  if(Serial.available() <= 0) { return false; }
   
   // Don't read unless there you know there is data. Stop reading if one less than the size of the array.
-  while (Serial.available() > 0 && i < bufSize-1) { 
-    buf[i++] = Serial.read(); // Read a character // Store it. Increment where to write next
-  }
+  // Read a character. Store it. Increment where to write next
+  byte i = 0;
+  while (Serial.available() > 0 && i < len-1) { buf[i++] = Serial.read(); } 
+  buf[i] = 0; // Null terminate the string
   
-  buf[i] = '\0'; // Null terminate the string
   #ifdef DEBUG_SERIAL
   debug_log("Serial Read Message", "'" + String(buf) + "'");
   #endif
+  
+  return true;
 }
 
 // Returns false if we failed to parse a NMEA sentence from GPS
@@ -272,46 +272,59 @@ bool gps_parse_new_data(char* buf = NULL) {
   return true;
 }
 
+void beacon_interpret_serial(char* in, uint8_t len) {
+  // If it's a message: do this
+  memcpy(beaconData.msg, in, len < MAX_MSG_LEN ? len : MAX_MSG_LEN);
+  // Else
+  // DO SOME OTHER THING
+
+  // Note: Can interpret commands from input stream aside from just messages.
+}
+
 void beacon_input_stream() {
   
   // Read from serial
-  serial_read_message(serial_in_buf); // populate beacon data struct with message from serial
+  if(serial_read_message(serial_in_buf, MAX_SERIAL_IN_LEN)) { // populate beacon data struct with message from serial
+    // DO SOMETHING
+    beacon_interpret_serial(serial_in_buf, MAX_SERIAL_IN_LEN);
+  } else {
+    // DO SOME CORRECTION
+  }
   
   // NOTE: GPS must be parsed and logged onto the GPS struct every frame.
   // If cannot parse new data, don't do anything.
-  if(!gps_parse_new_data()) {
+  if(gps_parse_new_data()) {
     // DO SOMETHING
+  } else {
+    // DO SOME CORRECTION
   }
 }
-
 
 // BEACON DATA HELPER FUNCTIONS
 
 // Populate beacon data struct with GPS values
-void gps_update_beacon_data(BeaconData* data) {
+void gps_update_beacon_data(BeaconData* data, Adafruit_GPS* gps_in) {
   #ifdef DEBUG_BEACON
   debug_log("Function", "GPS Update Beacon Data");
   #endif
   
   // GPS FIX
-  data->fix = GPS.fix;
-  data->fixq = GPS.fixquality;
+  data->fix = gps_in->fix;
+  data->fixq = gps_in->fixquality;
 
   // GPS DATE TIME
-  data->hour = GPS.hour;
-  data->minute = GPS.minute;
-  data->seconds = GPS.seconds;
-  data->day = GPS.day;
-  data->month = GPS.month;
-  data->year = GPS.year;
+  data->hour = gps_in->hour;
+  data->minute = gps_in->minute;
+  data->seconds = gps_in->seconds;
+  data->day = gps_in->day;
+  data->month = gps_in->month;
+  data->year = gps_in->year;
 
   // GPS POSITION
-  data->latitude = !GPS.fix ? 0 : GPS.latitudeDegrees;
-  data->longitude = !GPS.fix ? 0 : GPS.longitudeDegrees;
-  data->altitude = !GPS.fix ? 0 : GPS.altitude;
-  data->hdop = !GPS.fix ? 0 : GPS.HDOP;
-
-  memcpy(data->msg, serial_in_buf, MAX_MSG_LEN);
+  data->latitude = !gps_in->fix ? 0 : gps_in->latitudeDegrees;
+  data->longitude = !gps_in->fix ? 0 : gps_in->longitudeDegrees;
+  data->altitude = !gps_in->fix ? 0 : gps_in->altitude;
+  data->hdop = !gps_in->fix ? 0 : gps_in->HDOP;
 }
 
 void gps_clear_beacon_data(BeaconData* data) {
@@ -336,14 +349,11 @@ void gps_clear_beacon_data(BeaconData* data) {
   data->longitude = 0;
   data->altitude = 0;
   data->hdop = 0;
-
-  // MSG BUF
-  clear_buf(data->msg);
 }
 
 // Print beacon data to serial
-void serial_print_beacon_data(char* buf, BeaconData* data) {
-  
+void serial_print_beacon_data(BeaconData* data, char* buf) {
+
   #ifdef NICE_FORMAT
   sprintf(buf, 
     "\nTime: %2d:%2d:%2d.%d\nDate: %2d/%2d/20%2d\nFix: %d Quality:%d\nMessage: %s\nSending Beacon Signal...\nLocation: %f%s, %f%s\nAltitude: %f",
@@ -387,10 +397,10 @@ template<typename T> void lora_send(T* buf, uint8_t len, uint8_t address) {
 void broadcast_beacon_data() {
 
   // Populating beacon data
-  gps_update_beacon_data(&beaconData); 
+  gps_update_beacon_data(&beaconData, &GPS); 
   
   // For Android App or Debug
-  serial_print_beacon_data(serial_out_buf, &beaconData); // print beacon data to serial.
+  serial_print_beacon_data(&beaconData, serial_out_buf); // print beacon data to serial.
 
   #ifdef DEBUG_BEACON
   debug_log("GPS FIX" , beaconData.fix ? "true" : "false" );
