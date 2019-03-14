@@ -17,6 +17,7 @@ logging.info('%d %s\n' % (5, 'sample'))
 
 def file_cmp(source, dest):
 	if not os.path.exists(dest):
+		logging.info("%s does not exist in %s" % (source, dest))
 		return False
 	return filecmp.cmp(source, dest)
 
@@ -55,6 +56,7 @@ def load_directory(dir_path, dest_path):
 		# try to load file
 		# skip to the next file if it already exists and it's the same file
 		if file_cmp(file_path, dest_file_path):
+			logging.info("Ignoring %s because it is the same as %s." (file_path, dest_file_path))
 			continue
 
 		# move the successfully loaded file
