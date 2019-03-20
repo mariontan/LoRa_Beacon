@@ -1,0 +1,77 @@
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:sample header
+
+ERROR:sample error
+
+INFO:5 sample
+
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
+INFO:creating directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:existing directory: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/outboxFolder
+INFO:load beacon data from path: /mnt/c/Users/XMMC/Developer/ECCE/beacon-lora-radiohead/inboxFolder
