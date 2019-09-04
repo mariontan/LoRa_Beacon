@@ -6,6 +6,26 @@ import serial
 import sqlite3
 import requests
 
+BEACON_TABLE = 'beacon'
+BEACON_TABLE_FIELDS = '''   id      INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        node    INTEGER NOT NULL,
+            rssi    INTEGER NOT NULL,
+        datetime    DATETIME NOT NULL,
+            lat         TEXT NOT NULL,
+            long        TEXT NOT NULL,
+            alt         TEXT NOT NULL,
+            hdop        TEXT NOT NULL,
+        msg         TEXT    
+        '''
+BEACON_TABLE_DEFAULT_VALUES = "NULL,?,?,?,?,?,?,?,?"
+BEACON_TABLE_NODE = 0;
+BEACON_TABLE_RSSI = 1;
+BEACON_TABLE_DATE = 2;
+BEACON_TABLE_LATITUDE = 3;
+BEACON_TABLE_LONGITUDE = 4;
+BEACON_TABLE_ALTITUDE = 5
+BEACON_TABLE_HDOP = 6;
+BEACON_TABLE_MESSAGE = 7;
 
 def read_data(node):
     data = []
@@ -20,38 +40,46 @@ def read_data(node):
     # return data without the trailing (#) stop byte
     return data[:-1]
 
+def reformat_date(date, from_timezone, to_timezone, from_format, to_format):
+    mydt = datetime.strptime(date, from_format)
+    mydt = timezone(from_timezone).localize(mydt)
+    currentime = mydt.astimezone(timezone(to_timezone))   
+    return currentime.strftime(to_format)
 
-def split_data(data):
-    data_string = ''.join(data)
-    data_string = data_string.split(';')
-    mydt = datetime.strptime(data_string[0], "%d%m%y,%H%M%S")
-    mydt = timezone('UTC').localize(mydt)
-    currentime = mydt.astimezone(timezone('Asia/Manila'))	
-    data_string[0] = currentime.strftime("%Y-%m-%d %H:%M:%S")
+def sanitize_data(data_string):
+    #TODO: Catch invalid dates
+    try:
+        data_string[BEACON_TABLE_DATE] = reformat_date(data_string[BEACON_TABLE_DATE],'UTC', 'Asia/Manila', "%d%m%y,%H%M%S", "%Y-%m-%d %H:%M:%S")
+    except:
+        data_string[BEACON_TABLE_DATE] = "00-00-00 00:00:00"
     return data_string
 
+def split_data(data):
+    raw_data = ''.join(data)
+    print(raw_data)
+    data_string = raw_data.split(';')
+    return sanitize_data(data_string)
+
+def create_table_if_not_exists(cursor, table, fields):
+    create_table_transaction = 'CREATE TABLE IF NOT EXISTS %s ( %s );' % (table, fields)
+    cursor.execute(create_table_transaction)
+
+def insert_into_table(cursor, db_connection, table, values, data):
+    insert_transaction = "INSERT INTO %s VALUES(%s);" % (table, values);
+    cursor.execute(insert_transaction,data)
+    db_connection.commit()
+
+def select_last_entry_from_table(cursor, table):
+    select_transaction = "SELECT * FROM %s WHERE id = (SELECT MAX(id) from %s);" % (table, table)
+    cursor.execute(select_transaction)
+    print(cursor.fetchall())
 
 def save_data(data):
     conn = sqlite3.connect('beaconrx.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS beacon
-        (   id		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	    datetime    DATETIME NOT NULL,
-	    node	INTEGER NOT NULL,
-            rssi   	INTEGER NOT NULL,
-            lat       	TEXT NOT NULL,
-	    nsd         TEXT NOT NULL,	
-            long       	TEXT NOT NULL,
-	    ewd         TEXT NOT NULL,
-            alt         TEXT NOT NULL,
-            hdop        TEXT NOT NULL,
-	    msg         TEXT 	
-        );
-        ''')
-    c.execute("INSERT INTO beacon VALUES(NULL,?,?,?,?,?,?,?,?,?,?);",data)
-    conn.commit()
-    c.execute("SELECT * FROM beacon WHERE id = (SELECT MAX(id) from beacon);")
-    print(c.fetchall())
+    create_table_if_not_exists(c, BEACON_TABLE, BEACON_TABLE_FIELDS)
+    insert_into_table(c, conn, BEACON_TABLE, BEACON_TABLE_DEFAULT_VALUES,data)
+    select_last_entry_from_table(c, BEACON_TABLE)
     conn.close()
 
 
