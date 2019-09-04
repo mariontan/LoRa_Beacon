@@ -12,6 +12,10 @@ uint8_t lora_buf[RH_RF95_MAX_MESSAGE_LEN];
 #define RF_SPREAD_FACTOR 7
 #define RF_CODING_RATE 5
 #define RF_RETRIES 0
+#define RF_TIMEOUT 4000
+#define RF_CAD_TIMEOUT 4000
+
+
 
 // CONSTANTS FOR SF AND BW USE CASES
 #define RF_SPREAD_FACTOR_7 7
@@ -31,7 +35,7 @@ uint8_t this_len, this_from, this_id;
 // LORA INITIALIZATION
 
 // Set RF95 Parameters
-void lora_set_parameters(float frequency = RF_FREQUENCY, int8_t txPower = RF_TX_POWER, bool useRFO = RF_USE_RFO, long bandwidth = RF_BANDWIDTH, int8_t spreadFactor = RF_SPREAD_FACTOR, int8_t codingRate = RF_CODING_RATE) {
+void lora_set_parameters(float frequency = RF_FREQUENCY, int8_t txPower = RF_TX_POWER, bool useRFO = RF_USE_RFO, long bandwidth = RF_BANDWIDTH, int8_t spreadFactor = RF_SPREAD_FACTOR, int8_t codingRate = RF_CODING_RATE, int8_t cadTimeout = RF_CAD_TIMEOUT) {
 
   #ifdef DEBUG_FUNCTION
   debug_log("Function", "lora_set_parameters");
@@ -57,6 +61,9 @@ void lora_set_parameters(float frequency = RF_FREQUENCY, int8_t txPower = RF_TX_
   // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8)
   RF_DRIVER.setCodingRate4(codingRate);
   debug_log("Coding Rate", String(codingRate) );
+
+  RF_DRIVER.setCADTimeout(cadTimeout);
+  debug_log("CAD Timeout", String(cadTimeout) );
 }
 
 void lora_default_parameters(int caseID = 0) {
@@ -99,13 +106,15 @@ void lora_set_source(uint8_t nodeID) {
 #ifdef LORA_TX
 
 // Set destination node's ID
-void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES) {
+void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES, uint8_t timeOut = RF_TIMEOUT) {
   debug_log("Lora Set Destination",String(nodeID) + " <- " + String(retries) + " retries");
   // Where we're sending packet
   rf_destination = nodeID;
   RF_MESSAGING.setHeaderTo(nodeID);
   if(retries > 0)
     RF_MESSAGING.setRetries(retries);
+  if(timeOut > 0)
+    RF_MESSAGING.setTimeout(timeOut);
 }
 
 // Send byte array payload over LoRa
