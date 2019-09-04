@@ -52,7 +52,7 @@ void setup()
     rf95d.setSignalBandwidth(125000);
   
     // Setup Spreading Factor (6 ~ 12)
-    rf95d.setSpreadingFactor(11);
+    rf95d.setSpreadingFactor(7);
     
     // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8) 
     rf95d.setCodingRate4(5);

@@ -6,7 +6,7 @@
 
 #define RF_FREQUENCY  433.00
 #define RF_AGGREGATOR_ID 0
-#define RF_NODE_ID    4
+#define RF_NODE_ID    6
 #define GPSSerial Serial1
 #define MAX_MSG_LEN 161
 
@@ -49,6 +49,8 @@ void setup() {
 
   /*--Initializing LoRa module--*/
   if (rf95m.init()) {
+    rf95d.setCADTimeout(4000);
+    
     //Adjust Frequency
     rf95d.setFrequency(RF_FREQUENCY);
 
@@ -60,7 +62,7 @@ void setup() {
     rf95d.setSignalBandwidth(125000);
 
     // Setup Spreading Factor (6 ~ 12)
-    rf95d.setSpreadingFactor(11);
+    rf95d.setSpreadingFactor(7);
 
     // Setup Coding Rate:5(4/5),6(4/6),7(4/7),8(4/8)
     rf95d.setCodingRate4(5);
@@ -71,7 +73,8 @@ void setup() {
 
     // Where we're sending packet
     rf95m.setHeaderTo(RF_AGGREGATOR_ID);
-    //rf95m.setRetries(7);
+    rf95m.setTimeout(4000);
+    //rf95m.setRetries(1);
   }
   for (int i = 0; i < sizeof(tx_buf); i++) { // Initialize buffer for transmitted data by filling with NULL
     tx_buf[i] = 0;
@@ -97,8 +100,8 @@ void loop() {
   }
   // if millis() or timer wraps around, we'll just reset it
   if (timer > millis()) timer = millis();
-  // approximately every 30 seconds or so, print out the current stats
-  if (millis() - timer > 20000) {
+  // approximately every X seconds or so, print out the current stats
+  if (millis() - timer > 10000) {
     timer = millis(); // reset the timer
 
     #ifdef NICEoutput
