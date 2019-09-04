@@ -26,7 +26,8 @@ uint8_t lora_buf[RH_RF95_MAX_MESSAGE_LEN];
 RH_RF95 RF_DRIVER(8, 3);                          //Singleton instance of the radio driver
 RHReliableDatagram RF_MESSAGING(RF_DRIVER, RF_THIS_ID);  //This class manages message delivery and reception
 uint8_t rf_destination;
-
+uint8_t this_len, this_from, this_id;
+  
 // LORA INITIALIZATION
 
 // Set RF95 Parameters
@@ -93,33 +94,6 @@ void lora_set_source(uint8_t nodeID) {
   RF_MESSAGING.setHeaderFrom(nodeID);
 }
 
-// Set up driver and messaging service.
-void lora_setup() {
-  
-  #ifdef DEBUG_FUNCTION
-  debug_log("Function", "Lora Setup");
-  #endif
-  
-  lora_set_parameters();
-  lora_set_source(RF_THIS_ID);
-}
-
-// Initialize LoRa components.
-bool lora_init() {
-  
-  #ifdef DEBUG_FUNCTION
-  debug_log("Function", "Lora Init");
-  #endif
-  
-  if (!RF_MESSAGING.init()){
-    Serial.println("init failed");
-    return false;
-  }
-  
-  lora_setup();
-  return true;
-}
-
 // TX HELPER FUNCTIONS
 
 #ifdef LORA_TX
@@ -153,15 +127,17 @@ template<typename T> void lora_send(T* payload, uint8_t len, uint8_t address) {
 #ifdef LORA_RX
 
 // Receive byte array data from LoRa
-template<typename T> bool lora_recv(T* buf, uint8_t* len, uint8_t* from, uint8_t* id){
+template<typename T> bool lora_recv(T* buf, uint8_t buf_size, uint8_t *len, uint8_t *from, uint8_t *id){
 
   #ifdef DEBUG_FUNCTION
   debug_log("Function", "lora_recv");
   #endif
   
   // If no message is available, ignore and wait.
-  if (!RF_MESSAGING.available())
+  if (!RF_MESSAGING.available()) {
+    delay(1);
     return false;
+  }
 
   #ifdef DEBUG_LORA
   debug_log("LORA RECEIVE", "Available");
@@ -170,10 +146,12 @@ template<typename T> bool lora_recv(T* buf, uint8_t* len, uint8_t* from, uint8_t
   // If failed to received message from buffer, ignore and wait.
   if (!RF_MESSAGING.recvfromAck((uint8_t*)buf, len, from, NULL, id))
     return false;
-
+  
   #ifdef DEBUG_LORA
+  debug_log("Copied Size", String(buf_size));
   debug_log("Receiving From", String(*from));
   debug_log("Receiving Size in Bytes", String(*len));
+  debug_log("Receiving ID", String(*id));
   #endif
 
   return true;
@@ -185,3 +163,34 @@ void print_lora_info(char* buf, uint from, uint rssi) {
   Serial.print(buf); 
 }
 #endif
+
+
+// Set up driver and messaging service.
+void lora_setup() {
+  
+  #ifdef DEBUG_FUNCTION
+  debug_log("Function", "Lora Setup");
+  #endif
+  
+  lora_set_parameters();
+  lora_set_source(RF_THIS_ID);
+
+  #ifdef RF_DESTINATION_ID
+  lora_set_destination(RF_DESTINATION_ID);
+  #endif
+}
+
+// Initialize LoRa components.
+bool lora_init() {
+  
+  #ifdef DEBUG_FUNCTION
+  debug_log("Function", "Lora Init");
+  #endif
+  
+  while (!RF_MESSAGING.init()){
+    debug_log("ERROR", "lora init failed");
+  }
+  
+  lora_setup();
+  return true;
+}

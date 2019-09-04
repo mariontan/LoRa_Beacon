@@ -47,22 +47,31 @@ def reformat_date(date, from_timezone, to_timezone, from_format, to_format):
     return currentime.strftime(to_format)
 
 def sanitize_data(data_string):
-    data_string[BEACON_TABLE_DATE] = reformat_date(data_string[BEACON_TABLE_DATE],'UTC', 'Asia/Manila', "%d%m%y,%H%M%S", "%Y-%m-%d %H:%M:%S")
+    #TODO: Catch invalid dates
+    try:
+        data_string[BEACON_TABLE_DATE] = reformat_date(data_string[BEACON_TABLE_DATE],'UTC', 'Asia/Manila', "%d%m%y,%H%M%S", "%Y-%m-%d %H:%M:%S")
+    except:
+        data_string[BEACON_TABLE_DATE] = "00-00-00 00:00:00"
     return data_string
 
 def split_data(data):
-    data_string = ''.join(data).split(';')
-    return sanitize_data(data_string);
+    raw_data = ''.join(data)
+    print(raw_data)
+    data_string = raw_data.split(';')
+    return sanitize_data(data_string)
 
 def create_table_if_not_exists(cursor, table, fields):
-    cursor.execute('CREATE TABLE IF NOT EXISTS %s ( %s );' % (table, fields))
+    create_table_transaction = 'CREATE TABLE IF NOT EXISTS %s ( %s );' % (table, fields)
+    cursor.execute(create_table_transaction)
 
 def insert_into_table(cursor, db_connection, table, values, data):
-    cursor.execute("INSERT INTO %s VALUES(%s);" % (table, values) ,data)
+    insert_transaction = "INSERT INTO %s VALUES(%s);" % (table, values);
+    cursor.execute(insert_transaction,data)
     db_connection.commit()
 
-def select_last_entry_from_table(cursor, table)
-    cursor.execute("SELECT * FROM %s WHERE id = (SELECT MAX(id) from %s);" % (table, table))
+def select_last_entry_from_table(cursor, table):
+    select_transaction = "SELECT * FROM %s WHERE id = (SELECT MAX(id) from %s);" % (table, table)
+    cursor.execute(select_transaction)
     print(cursor.fetchall())
 
 def save_data(data):

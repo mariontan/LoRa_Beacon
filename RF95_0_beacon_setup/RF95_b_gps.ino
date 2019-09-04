@@ -10,6 +10,7 @@ void gps_init(uint baudRate = GPS_BAUDRATE) {
   // Set the hardware serial port to the baudrate of the GPS receiver
   Serial.begin(baudRate);
   GPSSerial.begin(baudRate);
+  while(!GPSSerial);
   
   // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
@@ -28,7 +29,7 @@ bool gps_parse_new_data(char* buf = NULL) {
   char c = GPS.read();
   // if you want to debug, this is a good time to do it!
   #ifdef DEBUG_NMEA
-  if (c) debug_log("GPSECHO", String(c));
+  //if (c) debug_log("GPSECHO", String(c));
   #endif
   // if a sentence is received, we can check the checksum, parse it...
   if (!GPS.newNMEAreceived()) return false;

@@ -1,9 +1,7 @@
 // Set DEBUG SETTINGS HERE
-//#define MAX_DEBUG_LEN 640
+#define MAX_DEBUG_LEN 640
 //#define DEBUG_FUNCTION
-//#define DEBUG_BEACON
 //#define DEBUG_BUFFER
-//#define DEBUG_NMEA
 //#define DEBUG_SERIAL
 
 #ifdef MAX_DEBUG_LEN

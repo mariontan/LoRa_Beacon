@@ -11,7 +11,13 @@ char serial_in_buf[MAX_SERIAL_IN_LEN]; // Buffer for serial input.
 // Populate message buffer from Serial
 bool serial_read_message(char* buf, uint8_t max_len) {
   // If there's nothing to read, do nothing.
-  if(Serial.available() <= 0) { return false; }
+  if(Serial.available() <= 0) { 
+    #ifdef DEBUG_SERIAL
+    debug_log("Serial Message", "NONE");
+    #endif
+    
+    return false; 
+  }
   
   // Don't read unless there you know there is data. Stop reading if one less than the size of the array.
   // Read a character. Store it. Increment where to write next
@@ -20,7 +26,7 @@ bool serial_read_message(char* buf, uint8_t max_len) {
   buf[i] = 0; // Null terminate the string
   
   #ifdef DEBUG_SERIAL
-  debug_log("Serial Read Message", "'" + String(buf) + "'");
+  debug_log("Serial Message", "'" + String(buf) + "'");
   #endif
   
   return true;

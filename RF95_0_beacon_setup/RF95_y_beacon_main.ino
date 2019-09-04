@@ -53,25 +53,30 @@ void broadcast_beacon_data() {
   #endif
 
   // Actually send it.
+  #ifdef DEBUG_BEACON
+  debug_log("DATA", String((char*)&beaconData));
+  #endif
   lora_send(&beaconData);
+  #ifdef DEBUG_BEACON
+  debug_log("MAX_MSG_LEN", String(MAX_MSG_LEN));
+  #endif
 }
 
 // BEACON USE CASE
 
-bool beacon_setup() {
+void beacon_setup() {
 
+  // Clear Beacon Data
+  clear_buf((uint8_t*)&beaconData); // Hacky Clearing of beacon data
+  
+  Serial.begin(SERIAL_BAUDRATE);
+  while (!Serial); // Wait for serial port to be available
+  
   // Initialize GPS
   gps_init();
   
-  // Clear Beacon Data
-  // clear_beacon_data(&beaconData); // Old way of clearing beacon data
-  clear_buf((uint8_t*)&beaconData); // Hacky Clearing of beacon data
-  
   // Initialize LoRa
-  if (!lora_init()) return false;
-
-  // TODO: Put here functions that should not be done until lora is initialized.
-  return true;
+  lora_init();
 }
 
 void beacon_loop() {

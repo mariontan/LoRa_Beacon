@@ -1,5 +1,5 @@
 #define BEACON_META_LEN 24
-#define MAX_MSG_LEN (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN) // 161
+#define MAX_MSG_LEN (RH_RF95_MAX_MESSAGE_LEN - BEACON_META_LEN - 4) // 161
 
 // 24 metadata bytes + MAX_MSG_LEN bytes
 struct BeaconData {     //stores the sensor values in a struct for easier sending and receiving via LoRa
