@@ -107,7 +107,7 @@ void lora_set_source(uint8_t nodeID) {
 
 // Set destination node's ID
 void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES, uint8_t timeOut = RF_TIMEOUT) {
-  debug_log("Lora Set Destination",String(nodeID) + " <- " + String(retries) + " retries");
+  debug_log("Lora Set Destination",String(nodeID) + " <- " + String(retries) + " retries " + String(timeOut) + " timeout in seconds");
   // Where we're sending packet
   rf_destination = nodeID;
   RF_MESSAGING.setHeaderTo(nodeID);
