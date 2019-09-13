@@ -1,5 +1,5 @@
 // Set DEBUG SETTINGS HERE
-#define MAX_DEBUG_LEN 640
+//#define MAX_DEBUG_LEN 640
 //#define DEBUG_FUNCTION
 //#define DEBUG_BUFFER
 //#define DEBUG_SERIAL
@@ -10,6 +10,8 @@ char debug_buf[MAX_DEBUG_LEN]; // Buffer for debugger
 
 // HELPERS
 void debug_log(String tag, String log_buf) {
+  
+  if(!Serial) return; // Wait for serial port to be available
   #ifdef MAX_DEBUG_LEN
   String buf = tag + ": " + log_buf;
   buf.toCharArray(debug_buf, MAX_DEBUG_LEN);

@@ -105,7 +105,7 @@ void lora_set_source(uint8_t nodeID) {
 
 // Set destination node's ID
 void lora_set_destination(uint8_t nodeID, uint8_t retries = RF_RETRIES, uint8_t timeOut = RF_TIMEOUT) {
-  debug_log("Lora Set Destination",String(nodeID) + " <- " + String(retries) + " retries");
+  debug_log("Lora Set Destination",String(nodeID) + " <- " + String(retries) + " retries " + String(timeOut) + " timeout in seconds");
   // Where we're sending packet
   rf_destination = nodeID;
   RF_MESSAGING.setHeaderTo(nodeID);
@@ -122,7 +122,9 @@ template<typename T> void lora_send(T* payload) {
 
 // Send byte array payload over LoRa
 template<typename T> void lora_send(T* payload, uint8_t len, uint8_t address) {
+  #ifdef DEBUG_LORA
   debug_log("LoRa Send" , String(len) + " bytes to node #" + String(address) );
+  #endif
   RF_MESSAGING.sendtoWait((uint8_t*)payload, len, address);// send buffered data to aggregator
   RF_MESSAGING.waitPacketSent(); // wait until properly sent
 }
@@ -151,8 +153,11 @@ template<typename T> bool lora_recv(T* buf, uint8_t buf_size, uint8_t *len, uint
   #endif
   
   // If failed to received message from buffer, ignore and wait.
-  if (!RF_MESSAGING.recvfromAck((uint8_t*)buf, len, from, NULL, id))
+  if (!RF_MESSAGING.recvfromAck(lora_buf, len, from, NULL, id))
     return false;
+  
+  // Need another buffer to read from lora instead of just putting itdirectly onto your intended buffer.
+  memcpy(buf, lora_buf, buf_size);
   
   #ifdef DEBUG_LORA
   debug_log("Copied Size", String(buf_size));
@@ -164,10 +169,9 @@ template<typename T> bool lora_recv(T* buf, uint8_t buf_size, uint8_t *len, uint
   return true;
 }
 
-// Print LoRa message from ID and RSSI.
-void print_lora_info(char* buf, uint from, uint rssi) {
+// Format LoRa message from ID and RSSI.
+void to_string_lora_info(char* buf, uint from, uint rssi) {
   sprintf(buf,"%d;%d;",from, rssi);
-  Serial.print(buf); 
 }
 #endif
 

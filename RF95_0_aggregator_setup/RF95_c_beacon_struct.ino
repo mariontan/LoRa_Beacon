@@ -9,8 +9,9 @@ struct BeaconData {     //stores the sensor values in a struct for easier sendin
   char msg[MAX_MSG_LEN]; // MAX_MSG_LEN bytes
 };
 
-// Print beacon GPS and message to serial.
-void print_beacon(char* buf, struct BeaconData* data) {
+// Format beacon GPS and message to serial.
+void to_string_beacon(char* buf, struct BeaconData* data) {
+  
   // Reconstruct UTC date and time
   // Print delimited sentence
   sprintf(buf, 
@@ -19,5 +20,4 @@ void print_beacon(char* buf, struct BeaconData* data) {
     data->hour, data->minute, data->seconds,
     data->latitude, data->longitude,
     data->altitude, data->hdop, data->msg);
-  Serial.print(buf); 
 }
