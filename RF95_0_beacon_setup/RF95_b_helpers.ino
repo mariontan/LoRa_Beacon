@@ -1,10 +1,11 @@
 // Clear an array buffer
 template<typename T> void clear_buf(T* buf) {
   // Clear buffer content by filling it with NULL
-  #ifdef DEBUG_BUF
+  #ifdef DEBUG_BUFFER
   debug_log("Function", "Clear Array Buffer");
   #endif
-  for (int i = 0; i < sizeof(buf); i++) { buf[i] = 0; }
+  uint8_t* for_clear = (uint8_t*) buf;
+  for (int i = 0; i < sizeof(for_clear); i++) { for_clear[i] = 0; }
 }
 
 /***getting the data type of variable***/

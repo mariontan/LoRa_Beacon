@@ -12,10 +12,8 @@ uint8_t lora_buf[RH_RF95_MAX_MESSAGE_LEN];
 #define RF_SPREAD_FACTOR 7
 #define RF_CODING_RATE 5
 #define RF_RETRIES 0
-#define RF_TIMEOUT 4000
 #define RF_CAD_TIMEOUT 4000
-
-
+#define RF_TIMEOUT 4000
 
 // CONSTANTS FOR SF AND BW USE CASES
 #define RF_SPREAD_FACTOR_7 7
@@ -145,16 +143,24 @@ template<typename T> bool lora_recv(T* buf, uint8_t buf_size, uint8_t *len, uint
   #endif
   
   // If no message is available, ignore and wait.
-  if (!RF_MESSAGING.available())
+  if (!RF_MESSAGING.available()) {
+    delay(1);
     return false;
+  }
 
   #ifdef DEBUG_LORA
   debug_log("LORA RECEIVE", "Available");
   #endif
+  //delay(1);
   
   // If failed to received message from buffer, ignore and wait.
-  if (!RF_MESSAGING.recvfromAck((uint8_t*)buf, len, from, NULL, id))
+  if (!RF_MESSAGING.recvfromAck(lora_buf, len, from, NULL, id))
     return false;
+  
+  // Need another buffer to read from lora instead of just putting itdirectly onto your intended buffer.
+  memcpy(buf, lora_buf, buf_size);
+  //delay(1);
+  //clear_buf(lora_buf);
   
   #ifdef DEBUG_LORA
   debug_log("Copied Size", String(buf_size));
@@ -166,10 +172,9 @@ template<typename T> bool lora_recv(T* buf, uint8_t buf_size, uint8_t *len, uint
   return true;
 }
 
-// Print LoRa message from ID and RSSI.
-void print_lora_info(char* buf, uint from, uint rssi) {
+// Format LoRa message from ID and RSSI.
+void to_string_lora_info(char* buf, uint from, uint rssi) {
   sprintf(buf,"%d;%d;",from, rssi);
-  Serial.print(buf); 
 }
 #endif
 

@@ -53,6 +53,8 @@ void clear_beacon_data(struct BeaconData* data) {
 // Print beacon data to serial
 void print_beacon_data(struct BeaconData* data, char* buf) {
 
+  if(!Serial) return;
+  
   #ifdef NICE_FORMAT
   sprintf(buf, 
     NICE_FORMAT,
@@ -60,7 +62,6 @@ void print_beacon_data(struct BeaconData* data, char* buf) {
     data->day, data->month, data->year, 
     (int)data->fix, (int)data->fixq, data->msg,
     data->latitude, data->nsd, data->longitude, data->ewd, data->altitude);
-  Serial.println(buf);
   #endif
   
   #ifdef CSV_FORMAT // change to Single serial command, change to csv format for easy android parsing
@@ -68,8 +69,9 @@ void print_beacon_data(struct BeaconData* data, char* buf) {
     data->year, data->month, data->day, data->hour, data->minute, data->seconds, // 18 chars
     data->latitude, data->longitude, data->fix, // dddmm.mm,dddmm.mm,fff.ffff, 27
     data->fix ? data->msg : "NO GPS LOCK"); // 161
-  Serial.println(buf);
   #endif
+  
+  Serial.println(buf);
 
   #ifdef DEBUG_FUNCTION
   debug_log("Serial Print Beacon Data" , String(buf) );

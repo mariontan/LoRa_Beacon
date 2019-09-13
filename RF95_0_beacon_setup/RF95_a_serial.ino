@@ -10,6 +10,9 @@ char serial_in_buf[MAX_SERIAL_IN_LEN]; // Buffer for serial input.
 
 // Populate message buffer from Serial
 bool serial_read_message(char* buf, uint8_t max_len) {
+
+  if(!Serial) return false; // Wait for serial port to be available
+    
   // If there's nothing to read, do nothing.
   if(Serial.available() <= 0) { 
     #ifdef DEBUG_SERIAL

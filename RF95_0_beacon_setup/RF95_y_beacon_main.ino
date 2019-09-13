@@ -1,5 +1,6 @@
 // SET APP SETTINGS HERE
 //#define BROADCAST_ONLY_WITH_FIX
+#define READ_FROM_SERIAL
 
 BeaconData beaconData; // Storage for beacon data
 
@@ -15,7 +16,8 @@ void beacon_interpret_serial(char* in, uint8_t len) {
 }
 
 void beacon_input_stream() {
-  
+
+  #ifdef READ_FROM_SERIAL
   // Read from serial
   if(serial_read_message(serial_in_buf, MAX_SERIAL_IN_LEN)) { // populate beacon data struct with message from serial
     // DO SOMETHING
@@ -23,6 +25,7 @@ void beacon_input_stream() {
   } else {
     // DO SOME CORRECTION
   }
+  #endif
   
   // NOTE: GPS must be parsed and logged onto the GPS struct every frame.
   // If cannot parse new data, don't do anything.
@@ -70,8 +73,6 @@ void beacon_setup() {
   clear_buf((uint8_t*)&beaconData); // Hacky Clearing of beacon data
   
   Serial.begin(SERIAL_BAUDRATE);
-  while (!Serial); // Wait for serial port to be available
-  
   // Initialize GPS
   gps_init();
   
