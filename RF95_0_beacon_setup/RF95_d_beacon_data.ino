@@ -1,5 +1,5 @@
 #define CSV_FORMAT  "%d,%d,%d,%d,%d,%d,%f,%f,%d,%s"//NICE_FORMAT (Readable format for terminal) or CSV_FORMAT (Can be parsed with Beacon's Android App) to toggle
-//#define NICE_FORMAT "Time: %2d:%2d:%2d.%d\nDate: %2d/%2d/20%2d\nFix: %d Quality:%d\nMessage: %s\nSending Beacon Signal...\nLocation: %f%s, %f%s\nAltitude: %f"
+//#define NICE_FORMAT "Time: %2d:%2d:%2d.%d\nDate: %2d/%2d/20%2d\nFix: %d Quality:%d\nMessage: %s\nSending Beacon Signal...\nLocation: %f, %f\nAltitude: %f"
 
 // Populate beacon data struct with GPS values
 void update_beacon_data(struct BeaconData* data, struct Adafruit_GPS* gps_in) {
@@ -61,7 +61,7 @@ void print_beacon_data(struct BeaconData* data, char* buf) {
     data->hour, data->minute, data->seconds, GPS.milliseconds, 
     data->day, data->month, data->year, 
     (int)data->fix, (int)data->fixq, data->msg,
-    data->latitude, data->nsd, data->longitude, data->ewd, data->altitude);
+    data->latitude, data->longitude, data->altitude);
   #endif
   
   #ifdef CSV_FORMAT // change to Single serial command, change to csv format for easy android parsing
