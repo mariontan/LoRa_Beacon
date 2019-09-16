@@ -43,7 +43,8 @@ void broadcast_beacon_data() {
   update_beacon_data(&beaconData, &GPS); 
   
   // For Android App or Debug
-  print_beacon_data(&beaconData, serial_out_buf); // print beacon data to serial.
+  to_string_beacon(serial_out_buf, &beaconData);
+  Serial.println(serial_out_buf);
 
   #ifdef DEBUG_BEACON
   debug_log("GPS FIX" , beaconData.fix ? "true" : "false" );
