@@ -15,9 +15,9 @@ void to_string_beacon(char* buf, struct BeaconData* data) {
   // Reconstruct UTC date and time
   // Print delimited sentence
   //DDMMYY,hhmmss;lat;lon;alt;hdop;msg;fixQuality;fixIsTrue 
-  // 160919,044139;0.000020;121.076157;5.000000;4.010000;Help me please;0.000000;0.000000
+  // 160919,044139;0.000020;121.076157;5.000000;4.010000;Help me please;0.000000;0
   sprintf(buf, 
-    "%02d%02d%02d,%02d%02d%02d;%f;%f;%f;%f;%s;%f;%f", 
+    "%02d%02d%02d,%02d%02d%02d;%f;%f;%f;%f;%s;%d;%d", 
     data->day, data->month, data->year, 
     data->hour, data->minute, data->seconds,
     data->latitude, data->longitude,
