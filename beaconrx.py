@@ -7,17 +7,20 @@ import sqlite3
 import requests
 
 BEACON_TABLE = 'beacon'
-BEACON_TABLE_FIELDS = '''   id      INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        node    INTEGER NOT NULL,
-            rssi    INTEGER NOT NULL,
-        datetime    DATETIME NOT NULL,
-            lat         TEXT NOT NULL,
-            long        TEXT NOT NULL,
-            alt         TEXT NOT NULL,
-            hdop        TEXT NOT NULL,
-        msg         TEXT    
-        '''
-BEACON_TABLE_DEFAULT_VALUES = "NULL,?,?,?,?,?,?,?,?"
+BEACON_TABLE_FIELDS = '''id 
+    INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    node    INTEGER NOT NULL,
+    rssi    INTEGER NOT NULL,
+    datetime    DATETIME NOT NULL,
+    lat     TEXT NOT NULL,
+    long    TEXT NOT NULL,
+    alt     TEXT NOT NULL,
+    hdop    TEXT NOT NULL,
+    msg     TEXT,
+    fixq    INTEGER NOT NULL,
+    fix     INTEGER NOT NULL'''
+
+BEACON_TABLE_DEFAULT_VALUES = "NULL,?,?,?,?,?,?,?,?,?,?"
 BEACON_TABLE_NODE = 0;
 BEACON_TABLE_RSSI = 1;
 BEACON_TABLE_DATE = 2;
@@ -46,17 +49,27 @@ def reformat_date(date, from_timezone, to_timezone, from_format, to_format):
     currentime = mydt.astimezone(timezone(to_timezone))   
     return currentime.strftime(to_format)
 
+def forced_reformat_date(date):
+    return "20" + date[4:6] + "-" + date[2:4] + "-" + date[0:2] +  " " + date[7:9] + ":" + date[9:11] + ":" + date[11:13]
+
 def sanitize_data(data_string):
     #TODO: Catch invalid dates
+    orig_date = data_string[BEACON_TABLE_DATE]
     try:
-        data_string[BEACON_TABLE_DATE] = reformat_date(data_string[BEACON_TABLE_DATE],'UTC', 'Asia/Manila', "%d%m%y,%H%M%S", "%Y-%m-%d %H:%M:%S")
+        data_string[BEACON_TABLE_DATE] = reformat_date(orig_date,'UTC', 'Asia/Manila', "%d%m%y,%H%M%S", "%Y-%m-%d %H:%M:%S")
     except:
-        data_string[BEACON_TABLE_DATE] = "00-00-00 00:00:00"
+        try:
+            data_string[BEACON_TABLE_DATE] = forced_reformat_date(orig_date)
+            print("Forced to reformat date: %s" % orig_date)
+        except:
+            data_string[BEACON_TABLE_DATE] = "00-00-00 00:00:00"
+            print("Failed to reformat date: %s" % orig_date)
+
     return data_string
 
 def split_data(data):
     raw_data = ''.join(data)
-    print(raw_data)
+    print("Splitting: %s" % raw_data)
     data_string = raw_data.split(';')
     return sanitize_data(data_string)
 
@@ -86,10 +99,10 @@ def save_data(data):
 node_1 = serial.Serial('/dev/ttyACM0', 9600)
 select.select([],[],[],20.0)
 while True:
-    	data_returned = read_data(node_1)
-    	try:
-    		data_returned = split_data(data_returned)
-    		save_data(data_returned)
-	except Exception as e:
-		print(e)
+    data_returned = read_data(node_1)
+    try:
+        data_returned = split_data(data_returned)
+        save_data(data_returned)
+    except Exception as e:
+        print(e)
 

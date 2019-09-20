@@ -1,10 +1,9 @@
 // SIMPLE USE CASE
-#define DUMMY_TEST
 
 uint8_t simple_index = 0;
 
 void broadcast_test_data() {
-  #ifdef DUMMY_TEST
+  #ifdef RF_DUMMY_MODE
   sprintf((char*)lora_buf, "160919,044139;0.000020;121.076157;5.000000;4.010000;Help me please;0;0");
   #else
   sprintf((char*)lora_buf, "%d", simple_index++);

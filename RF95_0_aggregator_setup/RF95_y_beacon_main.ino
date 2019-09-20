@@ -30,8 +30,9 @@ void beacon_setup()
   Serial.begin(SERIAL_BAUDRATE);
 
   // Initialize LoRa
-  while (!lora_init());
-
+  // while (!lora_init());
+  lora_init();
+  
   // TODO: Put here functions that should not be done until lora is initialized.
 }
 
