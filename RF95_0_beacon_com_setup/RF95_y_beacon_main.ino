@@ -23,7 +23,7 @@ void broadcast_beacon_data() {
   update_beacon_data(&beaconData, &GPS); 
   
   // For Android App or Debug
-  to_string_beacon(serial_out_buf, &beaconData);
+  to_string_beacon(serial_out_buf, &beaconData, rf_destination);
   Serial.println(serial_out_buf);
 
   #ifdef DEBUG_BEACON
@@ -87,7 +87,8 @@ void process_data(uint8_t from, struct BeaconData* data) {
   Serial.print("#");
   to_string_lora_info(serial_out_buf,from,RF_DRIVER.lastRssi()); // Print LoRa Node and RSSI
   Serial.print(serial_out_buf);
-  to_string_beacon(serial_out_buf, data); // Print Beacon GPS and Message
+  //TODO: Deal Carriage return
+  to_string_beacon(serial_out_buf, data, RF_THIS_ID, from); // Print Beacon GPS and Message
   Serial.print(serial_out_buf);
   Serial.println("*");
 }
